@@ -18,10 +18,17 @@ body {
 
 html[data-runtime='extension'] body {
   width: 368px;
+  min-width: 368px;
 }
 
 html[data-runtime='extension'] #app {
   width: 368px;
+  min-width: 368px;
+}
+
+html[data-runtime='extension'] {
+  width: 368px;
+  min-width: 368px;
 }
 
 html[data-runtime='web'] body {

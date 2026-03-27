@@ -1,12 +1,17 @@
 export type BrowserApi = typeof browser;
 export type AppRuntimeKind = 'extension' | 'web';
 
-function getBrowserGlobal() {
-  if (!('browser' in globalThis)) {
-    return undefined;
-  }
+type RuntimeCapableBrowserApi = BrowserApi & {
+  runtime?: BrowserApi['runtime'];
+};
 
-  return (globalThis as typeof globalThis & { browser?: BrowserApi }).browser;
+function getBrowserGlobal() {
+  const extensionGlobal = globalThis as typeof globalThis & {
+    browser?: RuntimeCapableBrowserApi;
+    chrome?: RuntimeCapableBrowserApi;
+  };
+
+  return extensionGlobal.browser ?? extensionGlobal.chrome;
 }
 
 export function getBrowserApi(): BrowserApi | undefined {
