@@ -13,6 +13,7 @@ import { renderMainTemplate, renderOnboardingTemplate } from './templates';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 const scanner = new QRScanner('qr-reader');
+const DEFAULT_SCANNER_ASPECT_RATIO = 16 / 9;
 
 type GenerateStatusType = 'success' | 'info' | 'error';
 type MainTab = 'generate' | 'scan';
@@ -35,6 +36,7 @@ interface MainElements {
   languageSelect: HTMLSelectElement;
   scanBtn: HTMLButtonElement;
   scannerContainer: HTMLDivElement;
+  scannerPreview: HTMLDivElement;
   scannerLoading: HTMLDivElement;
   qrReader: HTMLDivElement;
   scanStatus: HTMLDivElement;
@@ -268,12 +270,31 @@ function setScannerLoading(isLoading: boolean) {
   mainElements?.scannerLoading.classList.toggle('hidden', !isLoading);
 }
 
+function resetScannerPreviewAspectRatio() {
+  mainElements?.scannerPreview.style.setProperty(
+    '--scanner-aspect-ratio',
+    String(DEFAULT_SCANNER_ASPECT_RATIO),
+  );
+}
+
+function syncScannerPreviewAspectRatio(video: HTMLVideoElement | null) {
+  if (!mainElements || !video || video.videoWidth <= 0 || video.videoHeight <= 0) {
+    return;
+  }
+
+  mainElements.scannerPreview.style.setProperty(
+    '--scanner-aspect-ratio',
+    String(video.videoWidth / video.videoHeight),
+  );
+}
+
 function watchScannerVideoReady() {
   if (!mainElements) {
     return;
   }
 
   disposeVideoReadyWatcher?.();
+  resetScannerPreviewAspectRatio();
   setScannerLoading(true);
 
   let cleanedUp = false;
@@ -282,6 +303,7 @@ function watchScannerVideoReady() {
   let currentVideo: HTMLVideoElement | null = null;
 
   const handleReady = () => {
+    syncScannerPreviewAspectRatio(currentVideo);
     setScannerLoading(false);
     cleanup();
   };
@@ -350,6 +372,7 @@ async function stopScanner() {
   disposeVideoReadyWatcher?.();
   disposeVideoReadyWatcher = null;
   setScannerLoading(false);
+  resetScannerPreviewAspectRatio();
 
   if (scanning) {
     await scanner.stop();
@@ -412,6 +435,7 @@ function getMainElements(): MainElements {
     languageSelect: document.querySelector<HTMLSelectElement>('#main-language-select')!,
     scanBtn: document.querySelector<HTMLButtonElement>('#scan-btn')!,
     scannerContainer: document.querySelector<HTMLDivElement>('#scanner-container')!,
+    scannerPreview: document.querySelector<HTMLDivElement>('#scanner-preview')!,
     scannerLoading: document.querySelector<HTMLDivElement>('#scanner-loading')!,
     qrReader: document.querySelector<HTMLDivElement>('#qr-reader')!,
     scanStatus: document.querySelector<HTMLDivElement>('#scan-status')!,
@@ -522,6 +546,7 @@ async function bindMainViewEvents() {
         disposeVideoReadyWatcher?.();
         disposeVideoReadyWatcher = null;
         setScannerLoading(false);
+        resetScannerPreviewAspectRatio();
         scanning = false;
         setScanButtonState(false);
         mainElements.scannerContainer.classList.add('hidden');
@@ -684,6 +709,7 @@ async function renderMainView() {
   updateDocumentMetadata(translate('popupTitle'));
   app.innerHTML = renderMainTemplate(state.locale, state.selectedTab);
   mainElements = getMainElements();
+  resetScannerPreviewAspectRatio();
   await bindMainViewEvents();
 }
 

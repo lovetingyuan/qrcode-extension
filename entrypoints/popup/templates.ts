@@ -124,19 +124,21 @@ export function renderMainTemplate(locale: SupportedLocale, selectedTab: MainTab
           <div class="text-xs leading-4 text-base-content/75">${t(locale, 'scanTip')}</div>
           <button id="scan-btn" class="btn btn-primary btn-block">${t(locale, 'scanStart')}</button>
           <div role="alert" id="camera-hint" class="alert alert-info text-xs">${t(locale, 'cameraHint')}</div>
-          <div
-            id="scanner-container"
-            class="hidden relative min-h-60 overflow-hidden rounded-lg bg-[radial-gradient(circle_at_top,_rgb(16_185_129_/_0.18),_transparent_55%),_rgb(5_23_17_/_0.96)]"
-          >
+          <div id="scanner-container" class="hidden w-full">
             <div
-              id="scanner-loading"
-              class="hidden absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-[linear-gradient(180deg,_rgb(5_23_17_/_0.82),_rgb(5_23_17_/_0.62))] text-emerald-50 backdrop-blur-[4px]"
-              aria-live="polite"
+              id="scanner-preview"
+              class="relative overflow-hidden rounded-lg bg-[radial-gradient(circle_at_top,_rgb(16_185_129_/_0.18),_transparent_55%),_rgb(5_23_17_/_0.96)]"
             >
-              <span class="loading loading-spinner loading-md"></span>
-              <span class="text-sm font-medium">${t(locale, 'scannerLoading')}</span>
+              <div
+                id="scanner-loading"
+                class="hidden absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-[linear-gradient(180deg,_rgb(5_23_17_/_0.82),_rgb(5_23_17_/_0.62))] text-emerald-50 backdrop-blur-[4px]"
+                aria-live="polite"
+              >
+                <span class="loading loading-spinner loading-md"></span>
+                <span class="text-sm font-medium">${t(locale, 'scannerLoading')}</span>
+              </div>
+              <div id="qr-reader"></div>
             </div>
-            <div id="qr-reader"></div>
           </div>
           <div id="scan-status" class="hidden"></div>
           <div id="scan-result" class="hidden flex flex-col gap-2">
