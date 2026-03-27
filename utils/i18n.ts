@@ -8,6 +8,7 @@ const localeLabels: Record<SupportedLocale, string> = {
 const messages = {
   'zh-CN': {
     popupTitle: '二维码工具',
+    githubLinkLabel: '打开 Github 仓库主页',
     languageLabel: '语言',
     onboardingEyebrow: '首次使用',
     onboardingTitle: '欢迎使用',
@@ -33,7 +34,7 @@ const messages = {
     qrMenuLabel: '二维码操作菜单',
     copyImage: '复制图片',
     downloadImage: '下载图片',
-    scanTip: '使用本机摄像头扫描二维码，使用时请将二维码靠近摄像头。',
+    scanTip: '使用本机摄像头扫描二维码，使用时请将二维码靠近摄像头。扫描需要一些时间。',
     scanStart: '开始扫描',
     scanStop: '停止扫描',
     cameraHint: '首次使用时浏览器可能会请求摄像头权限，请按照提示操作。',
@@ -62,6 +63,7 @@ const messages = {
   },
   en: {
     popupTitle: 'QR Code Tool',
+    githubLinkLabel: 'Open the GitHub repository homepage',
     languageLabel: 'Language',
     onboardingEyebrow: 'First launch',
     onboardingTitle: 'Welcome',
@@ -70,7 +72,7 @@ const messages = {
     useCasesTitle: 'Main features',
     useCaseScanTitle: 'Scan QR codes',
     useCaseScanDescription:
-      'Use your device camera to scan QR codes, then copy the result or open detected links.',
+      'Use your device camera to scan QR codes, then copy the result or open detected links. Scanning will take some time.',
     useCaseGenerateTitle: 'Generate QR codes',
     useCaseGenerateDescription:
       'Turn text or the current page URL into a QR code, then copy the image or download it.',
