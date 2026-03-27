@@ -1,0 +1,10 @@
+@import 'tailwindcss';
+@plugin "daisyui" {
+  themes: emerald --default;
+}
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+}

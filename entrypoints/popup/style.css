@@ -1,0 +1,36 @@
+@import 'tailwindcss';
+
+@plugin "daisyui" {
+  themes: emerald --default;
+}
+
+html,
+body {
+  margin: 0;
+  width: 368px;
+  /* min-height: 360px; */
+  background:
+    radial-gradient(circle at top, rgb(16 185 129 / 0.12), transparent 40%),
+    linear-gradient(180deg, rgb(249 252 250), rgb(241 248 243));
+}
+
+.tabs input[type='radio']:checked+.tab-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+#scanner-container video {
+  width: 100% !important;
+  height: auto !important;
+  border-radius: 0.5rem;
+}
+
+/* Hide html5-qrcode branding elements */
+#scanner-container img[alt='Info icon'] {
+  display: none !important;
+}
+
+#scanner-container #qr-shaded-region {
+  border-color: rgba(99, 102, 241, 0.5) !important;
+}

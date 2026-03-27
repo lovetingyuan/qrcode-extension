@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:daisyui.com)",
+      "WebFetch(domain:wxt.dev)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(npx wxt:*)",
+      "Bash(powershell -Command \"[System.Reflection.Assembly]::LoadWithPartialName\\('System.Windows.Forms'\\) | Out-Null; [System.Windows.Forms.MessageBox]::Show\\('camera-permission 倒计时关闭功能已完成', '任务完成', 'OK', 'Information'\\)\")",
+      "Bash(powershell -Command \"[System.Reflection.Assembly]::LoadWithPartialName\\('System.Windows.Forms'\\) | Out-Null; [System.Windows.Forms.MessageBox]::Show\\('强调文案已添加完成', '任务完成', 'OK', 'Information'\\)\")"
+    ]
+  }
+}
