@@ -1,7 +1,18 @@
 import './style.css';
 import { generateQRCode } from '@/components/generator';
-import { QRScanner, type QRScannerError } from '@/components/scanner';
+import {
+  QRScanner,
+  type CameraPermissionMode,
+  type QRScannerError,
+} from '@/components/scanner';
 import { t, type TranslationKey } from '@/utils/i18n';
+import {
+  getActiveTabUrl,
+  getAppRuntimeKind,
+  getBrowserApi,
+  openUrl,
+  type BrowserApi,
+} from '@/utils/runtime';
 import {
   getInitialLocale,
   getResolvedSettings,
@@ -12,12 +23,18 @@ import {
 import { renderMainTemplate, renderOnboardingTemplate } from './templates';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
-const scanner = new QRScanner('qr-reader');
 const DEFAULT_SCANNER_ASPECT_RATIO = 16 / 9;
+const runtimeKind = getAppRuntimeKind();
+const browserApi = getBrowserApi();
+const scannerPermissionMode: CameraPermissionMode =
+  runtimeKind === 'extension' ? 'extension-page' : 'inline';
+const scanner = new QRScanner('qr-reader', {
+  permissionMode: scannerPermissionMode,
+});
 
 type GenerateStatusType = 'success' | 'info' | 'error';
 type MainTab = 'generate' | 'scan';
-type BrowserClipboardApi = typeof browser & {
+type BrowserClipboardApi = BrowserApi & {
   clipboard?: {
     setImageData?: (imageData: ArrayBuffer, imageType: 'png' | 'jpeg') => Promise<void>;
   };
@@ -46,7 +63,7 @@ interface MainElements {
   openBtn: HTMLButtonElement;
   genInput: HTMLTextAreaElement;
   genBtn: HTMLButtonElement;
-  genCurrentUrlBtn: HTMLButtonElement;
+  genCurrentUrlBtn: HTMLButtonElement | null;
   genStatus: HTMLDivElement;
   genOutput: HTMLDivElement;
   qrCanvasStage: HTMLDivElement;
@@ -99,6 +116,8 @@ function isSupportedTabUrl(url: string): boolean {
 function updateDocumentMetadata(title: string) {
   document.documentElement.lang = state.locale;
   document.title = title;
+  document.documentElement.dataset.runtime = runtimeKind;
+  document.body.dataset.runtime = runtimeKind;
 }
 
 function clearTimers() {
@@ -226,7 +245,7 @@ async function copyQrImageToClipboard() {
     return;
   }
 
-  const clipboardApi = (browser as BrowserClipboardApi).clipboard;
+  const clipboardApi = (browserApi as BrowserClipboardApi | undefined)?.clipboard;
   if (clipboardApi?.setImageData) {
     const buffer = await blob.arrayBuffer();
     await clipboardApi.setImageData(buffer, 'png');
@@ -445,7 +464,7 @@ function getMainElements(): MainElements {
     openBtn: document.querySelector<HTMLButtonElement>('#open-btn')!,
     genInput: document.querySelector<HTMLTextAreaElement>('#gen-input')!,
     genBtn: document.querySelector<HTMLButtonElement>('#gen-btn')!,
-    genCurrentUrlBtn: document.querySelector<HTMLButtonElement>('#gen-current-url-btn')!,
+    genCurrentUrlBtn: document.querySelector<HTMLButtonElement>('#gen-current-url-btn'),
     genStatus: document.querySelector<HTMLDivElement>('#gen-status')!,
     genOutput: document.querySelector<HTMLDivElement>('#gen-output')!,
     qrCanvasStage: document.querySelector<HTMLDivElement>('#qr-canvas-stage')!,
@@ -558,6 +577,8 @@ async function bindMainViewEvents() {
       },
       handleScannerError,
     );
+
+    await syncCameraPermissionHint();
   });
 
   mainElements.copyBtn.addEventListener('click', async () => {
@@ -586,7 +607,7 @@ async function bindMainViewEvents() {
 
   mainElements.openBtn.addEventListener('click', () => {
     if (state.scanResultText && isValidUrl(state.scanResultText)) {
-      browser.tabs.create({ url: state.scanResultText });
+      void openUrl(state.scanResultText);
     }
   });
 
@@ -622,16 +643,15 @@ async function bindMainViewEvents() {
     }
   });
 
-  mainElements.genCurrentUrlBtn.addEventListener('click', async () => {
+  mainElements.genCurrentUrlBtn?.addEventListener('click', async () => {
     if (!mainElements) {
       return;
     }
 
     try {
-      const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
-      const currentUrl = activeTab?.url?.trim();
+      const currentUrl = await getActiveTabUrl();
 
-      if (!activeTab || !currentUrl) {
+      if (!currentUrl) {
         throw new Error(translate('currentUrlMissing'));
       }
 
@@ -707,7 +727,10 @@ async function renderMainView() {
   await stopScanner();
   clearTimers();
   updateDocumentMetadata(translate('popupTitle'));
-  app.innerHTML = renderMainTemplate(state.locale, state.selectedTab);
+  app.innerHTML = renderMainTemplate(state.locale, state.selectedTab, {
+    showCurrentUrlButton: runtimeKind === 'extension',
+    generateInputRows: runtimeKind === 'web' ? 6 : 4,
+  });
   mainElements = getMainElements();
   resetScannerPreviewAspectRatio();
   await bindMainViewEvents();

@@ -7,11 +7,32 @@
 html,
 body {
   margin: 0;
-  width: 368px;
-  /* min-height: 360px; */
   background:
     radial-gradient(circle at top, rgb(16 185 129 / 0.12), transparent 40%),
     linear-gradient(180deg, rgb(249 252 250), rgb(241 248 243));
+}
+
+body {
+  box-sizing: border-box;
+}
+
+html[data-runtime='extension'] body {
+  width: 368px;
+}
+
+html[data-runtime='extension'] #app {
+  width: 368px;
+}
+
+html[data-runtime='web'] body {
+  width: 100%;
+  min-height: 100vh;
+  padding: 24px 16px;
+}
+
+html[data-runtime='web'] #app {
+  width: min(100%, 720px);
+  margin: 0 auto;
 }
 
 .tabs input[type='radio']:checked+.tab-content {
@@ -36,6 +57,10 @@ body {
   max-width: 100%;
   max-height: var(--scanner-max-height);
   aspect-ratio: var(--scanner-aspect-ratio);
+}
+
+html[data-runtime='web'] #scanner-preview {
+  --scanner-max-height: clamp(18rem, 52vh, 30rem);
 }
 
 #qr-reader {

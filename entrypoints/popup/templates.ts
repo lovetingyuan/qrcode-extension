@@ -2,6 +2,10 @@ import { getLocaleOptions, t } from '@/utils/i18n'
 import type { SupportedLocale } from '@/utils/settings'
 
 type MainTab = 'generate' | 'scan'
+interface MainTemplateOptions {
+  showCurrentUrlButton: boolean
+  generateInputRows: number
+}
 
 function renderLanguageOptions(selectedLocale: SupportedLocale) {
   return getLocaleOptions()
@@ -37,7 +41,11 @@ export function renderOnboardingTemplate(locale: SupportedLocale) {
   `
 }
 
-export function renderMainTemplate(locale: SupportedLocale, selectedTab: MainTab) {
+export function renderMainTemplate(
+  locale: SupportedLocale,
+  selectedTab: MainTab,
+  options: MainTemplateOptions,
+) {
   const githubUrl = 'https://github.com/lovetingyuan/qrcode-extension'
 
   return `
@@ -95,11 +103,15 @@ export function renderMainTemplate(locale: SupportedLocale, selectedTab: MainTab
             id="gen-input"
             class="textarea textarea-bordered w-full"
             placeholder="${t(locale, 'generatePlaceholder')}"
-            rows="4"
+            rows="${options.generateInputRows}"
           ></textarea>
-          <div class="grid grid-cols-2 gap-2">
+          <div class="grid gap-2 ${options.showCurrentUrlButton ? 'grid-cols-2' : 'grid-cols-1'}">
             <button id="gen-btn" class="btn btn-primary w-full" disabled>${t(locale, 'generateButton')}</button>
-            <button id="gen-current-url-btn" class="btn btn-outline btn-secondary w-full">${t(locale, 'generateCurrentUrlButton')}</button>
+            ${
+              options.showCurrentUrlButton
+                ? `<button id="gen-current-url-btn" class="btn btn-outline btn-secondary w-full">${t(locale, 'generateCurrentUrlButton')}</button>`
+                : ''
+            }
           </div>
           <div role="alert" id="gen-status" class="alert alert-error text-sm hidden"></div>
           <div id="gen-output" class="hidden flex flex-col items-center gap-2">
@@ -139,7 +151,7 @@ export function renderMainTemplate(locale: SupportedLocale, selectedTab: MainTab
         <div class="tab-content p-1 pt-5">
           <div class="text-xs leading-4 text-base-content/75">${t(locale, 'scanTip')}</div>
           <button id="scan-btn" class="btn btn-primary btn-block">${t(locale, 'scanStart')}</button>
-          <div role="alert" id="camera-hint" class="alert alert-info text-xs">${t(locale, 'cameraHint')}</div>
+          <div role="alert" id="camera-hint" class="alert alert-info text-xs hidden">${t(locale, 'cameraHint')}</div>
           <div id="scanner-container" class="hidden w-full">
             <div
               id="scanner-preview"

@@ -6,11 +6,14 @@ import {
   MultiFormatReader,
   RGBLuminanceSource,
 } from '@zxing/library';
+import { getBrowserApi } from '@/utils/runtime';
 
 export type QRScannerError =
   | { code: 'permission-denied' }
   | { code: 'permission-required' }
   | { code: 'camera-start-failed'; detail: string };
+
+export type CameraPermissionMode = 'extension-page' | 'inline';
 
 interface ScanRegion {
   x: number;
@@ -42,6 +45,7 @@ const MAX_UPSCALE_FACTOR = 2.5;
 
 export class QRScanner {
   private elementId: string;
+  private permissionMode: CameraPermissionMode;
   private stream: MediaStream | null = null;
   private video: HTMLVideoElement | null = null;
   private scanCanvas: HTMLCanvasElement | null = null;
@@ -55,8 +59,12 @@ export class QRScanner {
   private sessionId = 0;
   private barcodeDetector: BarcodeDetectorLike | null = this.createBarcodeDetector();
 
-  constructor(elementId: string) {
+  constructor(
+    elementId: string,
+    options: { permissionMode?: CameraPermissionMode } = {},
+  ) {
     this.elementId = elementId;
+    this.permissionMode = options.permissionMode ?? 'inline';
   }
 
   async checkCameraPermission(): Promise<PermissionState> {
@@ -82,11 +90,18 @@ export class QRScanner {
       return;
     }
 
-    if (permState === 'prompt') {
-      const url = browser.runtime.getURL('/camera-permission.html');
-      await browser.tabs.create({ url });
-      onError({ code: 'permission-required' });
-      return;
+    if (permState === 'prompt' && this.permissionMode === 'extension-page') {
+      const browserApi = getBrowserApi();
+
+      if (
+        typeof browserApi?.runtime?.getURL === 'function' &&
+        typeof browserApi?.tabs?.create === 'function'
+      ) {
+        const url = browserApi.runtime.getURL('/camera-permission.html');
+        await browserApi.tabs.create({ url });
+        onError({ code: 'permission-required' });
+        return;
+      }
     }
 
     await this.stop();

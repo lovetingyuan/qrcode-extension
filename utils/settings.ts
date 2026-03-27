@@ -1,3 +1,5 @@
+import { getBrowserApi } from '@/utils/runtime';
+
 export type SupportedLocale = 'zh-CN' | 'en';
 
 export interface ExtensionSettings {
@@ -51,9 +53,10 @@ export function getInitialLocale(): SupportedLocale {
 
 export async function getExtensionSettings(): Promise<Partial<ExtensionSettings>> {
   let stored: unknown;
+  const browserApi = getBrowserApi();
 
-  if (browser.storage?.local) {
-    const result = await browser.storage.local.get(SETTINGS_KEY);
+  if (browserApi?.storage?.local) {
+    const result = await browserApi.storage.local.get(SETTINGS_KEY);
     stored = result[SETTINGS_KEY];
   } else {
     stored = readFallbackSettings();
@@ -87,6 +90,7 @@ export async function saveExtensionSettings(
   partial: Partial<ExtensionSettings>,
 ): Promise<ExtensionSettings> {
   const current = await getResolvedSettings();
+  const browserApi = getBrowserApi();
   const next: ExtensionSettings = {
     locale: isSupportedLocale(partial.locale) ? partial.locale : current.locale,
     onboardingCompleted:
@@ -95,8 +99,8 @@ export async function saveExtensionSettings(
         : current.onboardingCompleted,
   };
 
-  if (browser.storage?.local) {
-    await browser.storage.local.set({
+  if (browserApi?.storage?.local) {
+    await browserApi.storage.local.set({
       [SETTINGS_KEY]: next,
     });
   } else {

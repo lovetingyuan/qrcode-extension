@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="none" role="img" aria-labelledby="logo-title">
+  <title id="logo-title">QR Code Tool logo</title>
+  <defs>
+    <linearGradient id="bg" x1="28" y1="20" x2="220" y2="236" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#10B981" />
+      <stop offset="1" stop-color="#0B5D4C" />
+    </linearGradient>
+  </defs>
+
+  <rect x="12" y="12" width="232" height="232" rx="52" fill="url(#bg)" />
+  <rect x="22" y="22" width="212" height="212" rx="42" stroke="#F0FDF4" stroke-opacity="0.18" stroke-width="2" />
+
+  <rect
+    x="58"
+    y="56"
+    width="140"
+    height="140"
+    rx="38"
+    stroke="#F8FFFC"
+    stroke-width="22"
+  />
+
+  <path
+    d="M160 154L206 200"
+    stroke="#0D705A"
+    stroke-width="34"
+    stroke-linecap="round"
+  />
+  <path
+    d="M166 166L214 214"
+    stroke="#FCD34D"
+    stroke-width="18"
+    stroke-linecap="round"
+  />
+
+  <g fill="#F8FFFC">
+    <rect x="76" y="74" width="34" height="34" rx="8" />
+    <rect x="146" y="74" width="34" height="34" rx="8" />
+    <rect x="76" y="144" width="34" height="34" rx="8" />
+  </g>
+
+  <g fill="#0E6A55">
+    <rect x="86" y="84" width="14" height="14" rx="4" />
+    <rect x="156" y="84" width="14" height="14" rx="4" />
+    <rect x="86" y="154" width="14" height="14" rx="4" />
+  </g>
+</svg>
