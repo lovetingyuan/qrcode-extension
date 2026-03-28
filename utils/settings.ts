@@ -1,9 +1,11 @@
 import { getBrowserApi } from '@/utils/runtime';
 
 export type SupportedLocale = 'zh-CN' | 'en';
+export type SupportedTheme = 'emerald' | 'dracula';
 
 export interface ExtensionSettings {
   locale: SupportedLocale;
+  theme: SupportedTheme;
   onboardingCompleted: boolean;
 }
 
@@ -39,6 +41,10 @@ function isSupportedLocale(value: unknown): value is SupportedLocale {
   return value === 'zh-CN' || value === 'en';
 }
 
+function isSupportedTheme(value: unknown): value is SupportedTheme {
+  return value === 'emerald' || value === 'dracula';
+}
+
 export function normalizeLocale(value: unknown): SupportedLocale {
   if (isSupportedLocale(value)) {
     return value;
@@ -70,6 +76,7 @@ export async function getExtensionSettings(): Promise<Partial<ExtensionSettings>
 
   return {
     locale: isSupportedLocale(settings.locale) ? settings.locale : undefined,
+    theme: isSupportedTheme(settings.theme) ? settings.theme : undefined,
     onboardingCompleted:
       typeof settings.onboardingCompleted === 'boolean'
         ? settings.onboardingCompleted
@@ -82,6 +89,7 @@ export async function getResolvedSettings(): Promise<ExtensionSettings> {
 
   return {
     locale: stored.locale ?? getInitialLocale(),
+    theme: stored.theme ?? 'emerald',
     onboardingCompleted: stored.onboardingCompleted ?? false,
   };
 }
@@ -93,6 +101,7 @@ export async function saveExtensionSettings(
   const browserApi = getBrowserApi();
   const next: ExtensionSettings = {
     locale: isSupportedLocale(partial.locale) ? partial.locale : current.locale,
+    theme: isSupportedTheme(partial.theme) ? partial.theme : current.theme,
     onboardingCompleted:
       typeof partial.onboardingCompleted === 'boolean'
         ? partial.onboardingCompleted

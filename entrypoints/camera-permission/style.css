@@ -1,10 +1,24 @@
 @import 'tailwindcss';
 @plugin "daisyui" {
-  themes: emerald --default;
+  themes: emerald --default, dracula;
 }
 
 html,
 body {
   min-height: 100%;
   margin: 0;
+  background: var(--permission-background);
+  color: var(--color-base-content);
+}
+
+html {
+  --permission-background:
+    radial-gradient(circle at top, rgb(16 185 129 / 0.16), transparent 55%),
+    linear-gradient(180deg, rgb(244 251 247), rgb(234 246 238));
+}
+
+html[data-theme='dracula'] {
+  --permission-background:
+    radial-gradient(circle at top, rgb(189 147 249 / 0.18), transparent 45%),
+    linear-gradient(180deg, rgb(40 42 54), rgb(28 29 38));
 }

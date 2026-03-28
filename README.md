@@ -4,6 +4,6 @@
 
 在线体验 [website](https://qrcode.tingyuan.in)
 
-<img src="./public/screenshot-1.png" alt="生成界面" width="420" />
+<img src="./assets/screenshot-1.png" alt="生成界面" width="420" />
 
-<img src="./public/screenshot-2.png" alt="扫描界面" width="420" />
+<img src="./assets/screenshot-2.png" alt="扫描界面" width="420" />

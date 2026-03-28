@@ -1,15 +1,19 @@
 import './style.css';
 import { t } from '@/utils/i18n';
-import { getResolvedSettings } from '@/utils/settings';
+import { getResolvedSettings, type SupportedTheme } from '@/utils/settings';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
+const THEME_META_COLORS: Record<SupportedTheme, string> = {
+  emerald: '#0b5d4c',
+  dracula: '#282a36',
+};
 
 function renderPermissionPage(locale: 'zh-CN' | 'en') {
   document.documentElement.lang = locale;
   document.title = t(locale, 'permissionPageTitle');
 
   app.innerHTML = `
-    <div class="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,_rgb(16_185_129_/_0.16),_transparent_55%),linear-gradient(180deg,_rgb(244_251_247),_rgb(234_246_238))]">
+    <div class="flex min-h-screen items-center justify-center">
       <div class="card mx-6 border border-base-300/80 bg-base-100/95 shadow-xl">
         <div class="card-body items-center text-center">
           <h2 class="card-title" id="title">${t(locale, 'permissionPageHeading')}</h2>
@@ -27,6 +31,10 @@ function renderPermissionPage(locale: 'zh-CN' | 'en') {
 async function setupPage() {
   const settings = await getResolvedSettings();
   const locale = settings.locale;
+  document.documentElement.dataset.theme = settings.theme;
+  document
+    .querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+    ?.setAttribute('content', THEME_META_COLORS[settings.theme]);
 
   renderPermissionPage(locale);
 

@@ -19,11 +19,16 @@ import {
   normalizeLocale,
   saveExtensionSettings,
   type SupportedLocale,
+  type SupportedTheme,
 } from '@/utils/settings';
 import { renderMainTemplate, renderOnboardingTemplate } from './templates';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 const DEFAULT_SCANNER_ASPECT_RATIO = 16 / 9;
+const THEME_META_COLORS: Record<SupportedTheme, string> = {
+  emerald: '#0b5d4c',
+  dracula: '#282a36',
+};
 const runtimeKind = getAppRuntimeKind();
 const browserApi = getBrowserApi();
 const scannerPermissionMode: CameraPermissionMode =
@@ -42,6 +47,7 @@ type BrowserClipboardApi = BrowserApi & {
 
 interface PopupState {
   locale: SupportedLocale;
+  theme: SupportedTheme;
   onboardingCompleted: boolean;
   selectedTab: MainTab;
   genInputText: string;
@@ -51,6 +57,7 @@ interface PopupState {
 
 interface MainElements {
   languageSelect: HTMLSelectElement;
+  themeToggleBtn: HTMLButtonElement;
   scanBtn: HTMLButtonElement;
   scannerContainer: HTMLDivElement;
   scannerPreview: HTMLDivElement;
@@ -62,6 +69,7 @@ interface MainElements {
   copyBtn: HTMLButtonElement;
   openBtn: HTMLButtonElement;
   genInput: HTMLTextAreaElement;
+  genClearBtn: HTMLButtonElement;
   genBtn: HTMLButtonElement;
   genCurrentUrlBtn: HTMLButtonElement | null;
   genStatus: HTMLDivElement;
@@ -77,6 +85,7 @@ interface MainElements {
 
 const state: PopupState = {
   locale: getInitialLocale(),
+  theme: 'emerald',
   onboardingCompleted: false,
   selectedTab: 'generate',
   genInputText: '',
@@ -117,7 +126,11 @@ function updateDocumentMetadata(title: string) {
   document.documentElement.lang = state.locale;
   document.title = title;
   document.documentElement.dataset.runtime = runtimeKind;
+  document.documentElement.dataset.theme = state.theme;
   document.body.dataset.runtime = runtimeKind;
+
+  const themeColorMeta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+  themeColorMeta?.setAttribute('content', THEME_META_COLORS[state.theme]);
 }
 
 function clearTimers() {
@@ -175,7 +188,10 @@ function updateGenerateButtonState() {
     return;
   }
 
-  mainElements.genBtn.disabled = mainElements.genInput.value.trim().length === 0;
+  const hasAnyInput = mainElements.genInput.value.length > 0;
+  const hasGeneratableInput = mainElements.genInput.value.trim().length > 0;
+  mainElements.genBtn.disabled = !hasGeneratableInput;
+  mainElements.genClearBtn.classList.toggle('hidden', !hasAnyInput);
 }
 
 function closeQrContextMenu() {
@@ -452,6 +468,7 @@ async function syncCameraPermissionHint() {
 function getMainElements(): MainElements {
   return {
     languageSelect: document.querySelector<HTMLSelectElement>('#main-language-select')!,
+    themeToggleBtn: document.querySelector<HTMLButtonElement>('#theme-toggle-btn')!,
     scanBtn: document.querySelector<HTMLButtonElement>('#scan-btn')!,
     scannerContainer: document.querySelector<HTMLDivElement>('#scanner-container')!,
     scannerPreview: document.querySelector<HTMLDivElement>('#scanner-preview')!,
@@ -463,6 +480,7 @@ function getMainElements(): MainElements {
     copyBtn: document.querySelector<HTMLButtonElement>('#copy-btn')!,
     openBtn: document.querySelector<HTMLButtonElement>('#open-btn')!,
     genInput: document.querySelector<HTMLTextAreaElement>('#gen-input')!,
+    genClearBtn: document.querySelector<HTMLButtonElement>('#gen-clear-btn')!,
     genBtn: document.querySelector<HTMLButtonElement>('#gen-btn')!,
     genCurrentUrlBtn: document.querySelector<HTMLButtonElement>('#gen-current-url-btn'),
     genStatus: document.querySelector<HTMLDivElement>('#gen-status')!,
@@ -529,6 +547,12 @@ async function bindMainViewEvents() {
   if (!mainElements) {
     return;
   }
+
+  mainElements.themeToggleBtn.addEventListener('click', async () => {
+    state.theme = state.theme === 'dracula' ? 'emerald' : 'dracula';
+    await saveExtensionSettings({ theme: state.theme });
+    await renderMainView();
+  });
 
   mainElements.languageSelect.addEventListener('change', async () => {
     state.locale = normalizeLocale(mainElements?.languageSelect.value);
@@ -618,6 +642,18 @@ async function bindMainViewEvents() {
 
     state.genInputText = mainElements.genInput.value;
     updateGenerateButtonState();
+  });
+
+  mainElements.genClearBtn.addEventListener('click', () => {
+    if (!mainElements) {
+      return;
+    }
+
+    mainElements.genInput.value = '';
+    state.genInputText = '';
+    updateGenerateButtonState();
+    hideGenerateStatus();
+    mainElements.genInput.focus();
   });
 
   mainElements.genBtn.addEventListener('click', async () => {
@@ -727,7 +763,7 @@ async function renderMainView() {
   await stopScanner();
   clearTimers();
   updateDocumentMetadata(translate('popupTitle'));
-  app.innerHTML = renderMainTemplate(state.locale, state.selectedTab, {
+  app.innerHTML = renderMainTemplate(state.locale, state.theme, state.selectedTab, {
     showCurrentUrlButton: runtimeKind === 'extension',
     generateInputRows: runtimeKind === 'web' ? 6 : 4,
   });
@@ -767,6 +803,7 @@ async function init() {
 
   const settings = await getResolvedSettings();
   state.locale = settings.locale;
+  state.theme = settings.theme;
   state.onboardingCompleted = settings.onboardingCompleted;
 
   if (state.onboardingCompleted) {
