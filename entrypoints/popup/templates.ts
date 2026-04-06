@@ -80,6 +80,7 @@ export function renderMainTemplate(
   selectedTab: MainTab,
   options: MainTemplateOptions,
 ) {
+  const appUrl = 'https://qrcode.tingyuan.in'
   const githubUrl = 'https://github.com/lovetingyuan/qrcode-extension'
 
   return `
@@ -93,7 +94,14 @@ export function renderMainTemplate(
             >
               <img src="/favicon.svg" alt="" class="h-6 w-6 shrink-0" />
             </span>
-            <h1 class="truncate text-left text-base">${t(locale, 'popupTitle')}</h1>
+            <a
+              href="${appUrl}"
+              target="_blank"
+              rel="noreferrer"
+              class="truncate text-left text-base no-underline transition hover:underline hover:underline-offset-2 hover:opacity-80"
+            >
+              ${t(locale, 'popupTitle')}
+            </a>
           </div>
           <div class="ml-auto flex items-center gap-2">
             <a
@@ -196,7 +204,14 @@ export function renderMainTemplate(
         />
         <div class="tab-content p-1 pt-5">
           <div class="text-xs leading-4 text-base-content/75">${t(locale, 'scanTip')}</div>
-          <button id="scan-btn" class="btn btn-primary btn-block">${t(locale, 'scanStart')}</button>
+          <div class="flex flex-col gap-2">
+            <button id="scan-btn" class="btn btn-primary btn-block">${t(locale, 'scanStart')}</button>
+            <div class="grid grid-cols-2 gap-2">
+              <button id="scan-local-image-btn" class="btn btn-outline btn-block">${t(locale, 'scanLocalImage')}</button>
+              <button id="scan-clipboard-btn" class="btn btn-outline btn-block">${t(locale, 'scanClipboardImage')}</button>
+            </div>
+          </div>
+          <input id="scan-image-input" type="file" accept="image/*" class="hidden" />
           <div role="alert" id="camera-hint" class="alert alert-info text-xs hidden">${t(locale, 'cameraHint')}</div>
           <div id="scanner-container" class="hidden w-full">
             <div

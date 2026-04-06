@@ -59,6 +59,9 @@ interface MainElements {
   languageSelect: HTMLSelectElement;
   themeToggleBtn: HTMLButtonElement;
   scanBtn: HTMLButtonElement;
+  scanLocalImageBtn: HTMLButtonElement;
+  scanClipboardBtn: HTMLButtonElement;
+  scanImageInput: HTMLInputElement;
   scannerContainer: HTMLDivElement;
   scannerPreview: HTMLDivElement;
   scannerLoading: HTMLDivElement;
@@ -198,6 +201,24 @@ function closeQrContextMenu() {
   mainElements?.qrContextMenu.classList.add('hidden');
 }
 
+function clearGeneratedCode() {
+  if (!mainElements) {
+    return;
+  }
+
+  closeQrContextMenu();
+  mainElements.genOutput.classList.add('hidden');
+  state.generatedText = null;
+
+  const context = mainElements.qrCanvas.getContext('2d');
+  if (context) {
+    context.clearRect(0, 0, mainElements.qrCanvas.width, mainElements.qrCanvas.height);
+  }
+
+  mainElements.qrCanvas.width = 0;
+  mainElements.qrCanvas.height = 0;
+}
+
 function hasGeneratedQrCode() {
   return (
     !!mainElements &&
@@ -299,6 +320,28 @@ function setScanButtonState(isScanning: boolean) {
   mainElements.scanBtn.textContent = isScanning ? translate('scanStop') : translate('scanStart');
   mainElements.scanBtn.classList.remove('btn-primary', 'btn-secondary');
   mainElements.scanBtn.classList.add(isScanning ? 'btn-secondary' : 'btn-primary');
+}
+
+function clearScanResult() {
+  if (!mainElements) {
+    return;
+  }
+
+  state.scanResultText = null;
+  mainElements.resultText.textContent = '';
+  mainElements.scanResult.classList.add('hidden');
+  mainElements.openBtn.classList.add('hidden');
+}
+
+function showScanResult(decodedText: string) {
+  if (!mainElements) {
+    return;
+  }
+
+  state.scanResultText = decodedText;
+  mainElements.resultText.textContent = decodedText;
+  mainElements.scanResult.classList.remove('hidden');
+  mainElements.openBtn.classList.toggle('hidden', !isValidUrl(decodedText));
 }
 
 function setScannerLoading(isLoading: boolean) {
@@ -431,6 +474,49 @@ function handleScannerError(error: QRScannerError) {
   showStatus(message, 'error');
 }
 
+async function decodeImageBlob(blob: Blob, loadingMessage: string) {
+  hideStatus();
+  clearScanResult();
+  showStatus(loadingMessage, 'info');
+
+  try {
+    const decodedText = await scanner.scanImageBlob(blob);
+
+    if (!decodedText) {
+      showStatus(translate('scanImageNotFound'), 'warning');
+      return;
+    }
+
+    hideStatus();
+    showScanResult(decodedText);
+  } catch (error) {
+    console.error('Image QR scan failed:', error);
+    showStatus(translate('scanImageReadFailed'), 'error');
+  }
+}
+
+async function getClipboardImageBlob(): Promise<Blob> {
+  if (!navigator.clipboard?.read) {
+    throw new Error(translate('scanClipboardUnsupported'));
+  }
+
+  let clipboardItems: ClipboardItem[];
+  try {
+    clipboardItems = await navigator.clipboard.read();
+  } catch {
+    throw new Error(translate('scanClipboardFailed'));
+  }
+
+  for (const item of clipboardItems) {
+    const imageType = item.types.find((type) => type.startsWith('image/'));
+    if (imageType) {
+      return item.getType(imageType);
+    }
+  }
+
+  throw new Error(translate('scanClipboardEmpty'));
+}
+
 async function renderGeneratedCode(text: string, options?: { syncInput?: boolean }) {
   if (!mainElements) {
     return;
@@ -470,6 +556,9 @@ function getMainElements(): MainElements {
     languageSelect: document.querySelector<HTMLSelectElement>('#main-language-select')!,
     themeToggleBtn: document.querySelector<HTMLButtonElement>('#theme-toggle-btn')!,
     scanBtn: document.querySelector<HTMLButtonElement>('#scan-btn')!,
+    scanLocalImageBtn: document.querySelector<HTMLButtonElement>('#scan-local-image-btn')!,
+    scanClipboardBtn: document.querySelector<HTMLButtonElement>('#scan-clipboard-btn')!,
+    scanImageInput: document.querySelector<HTMLInputElement>('#scan-image-input')!,
     scannerContainer: document.querySelector<HTMLDivElement>('#scanner-container')!,
     scannerPreview: document.querySelector<HTMLDivElement>('#scanner-preview')!,
     scannerLoading: document.querySelector<HTMLDivElement>('#scanner-loading')!,
@@ -505,13 +594,9 @@ function syncMainViewFromState() {
   setScanButtonState(scanning);
 
   if (state.scanResultText) {
-    mainElements.resultText.textContent = state.scanResultText;
-    mainElements.scanResult.classList.remove('hidden');
-    mainElements.openBtn.classList.toggle('hidden', !isValidUrl(state.scanResultText));
+    showScanResult(state.scanResultText);
   } else {
-    mainElements.resultText.textContent = '';
-    mainElements.scanResult.classList.add('hidden');
-    mainElements.openBtn.classList.add('hidden');
+    clearScanResult();
   }
 }
 
@@ -571,8 +656,7 @@ async function bindMainViewEvents() {
       return;
     }
 
-    state.scanResultText = null;
-    mainElements.scanResult.classList.add('hidden');
+    clearScanResult();
     hideStatus();
     mainElements.scannerContainer.classList.remove('hidden');
     watchScannerVideoReady();
@@ -594,15 +678,61 @@ async function bindMainViewEvents() {
         setScanButtonState(false);
         mainElements.scannerContainer.classList.add('hidden');
         hideStatus();
-
-        mainElements.resultText.textContent = decodedText;
-        mainElements.scanResult.classList.remove('hidden');
-        mainElements.openBtn.classList.toggle('hidden', !isValidUrl(decodedText));
+        showScanResult(decodedText);
       },
       handleScannerError,
     );
 
     await syncCameraPermissionHint();
+  });
+
+  mainElements.scanLocalImageBtn.addEventListener('click', async () => {
+    if (!mainElements) {
+      return;
+    }
+
+    await stopScanner();
+    hideStatus();
+    mainElements.scanImageInput.value = '';
+    mainElements.scanImageInput.click();
+  });
+
+  mainElements.scanImageInput.addEventListener('change', async () => {
+    const file = mainElements?.scanImageInput.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    await stopScanner();
+
+    try {
+      await decodeImageBlob(file, translate('scanImageLoading'));
+    } catch (error) {
+      showStatus(
+        error instanceof Error ? error.message : translate('scanImageReadFailed'),
+        'error',
+      );
+    } finally {
+      if (mainElements) {
+        mainElements.scanImageInput.value = '';
+      }
+    }
+  });
+
+  mainElements.scanClipboardBtn.addEventListener('click', async () => {
+    await stopScanner();
+    hideStatus();
+    showStatus(translate('scanClipboardLoading'), 'info');
+
+    try {
+      const blob = await getClipboardImageBlob();
+      await decodeImageBlob(blob, translate('scanImageLoading'));
+    } catch (error) {
+      showStatus(
+        error instanceof Error ? error.message : translate('scanClipboardFailed'),
+        'error',
+      );
+    }
   });
 
   mainElements.copyBtn.addEventListener('click', async () => {
@@ -641,6 +771,10 @@ async function bindMainViewEvents() {
     }
 
     state.genInputText = mainElements.genInput.value;
+    if (!mainElements.genInput.value.trim()) {
+      clearGeneratedCode();
+      hideGenerateStatus();
+    }
     updateGenerateButtonState();
   });
 
@@ -651,6 +785,7 @@ async function bindMainViewEvents() {
 
     mainElements.genInput.value = '';
     state.genInputText = '';
+    clearGeneratedCode();
     updateGenerateButtonState();
     hideGenerateStatus();
     mainElements.genInput.focus();
@@ -671,9 +806,7 @@ async function bindMainViewEvents() {
     try {
       await renderGeneratedCode(text);
     } catch (error) {
-      closeQrContextMenu();
-      mainElements.genOutput.classList.add('hidden');
-      state.generatedText = null;
+      clearGeneratedCode();
       showGenerateStatus(translate('generateFailed'));
       console.error('QR generation failed:', error);
     }
@@ -697,9 +830,7 @@ async function bindMainViewEvents() {
 
       await renderGeneratedCode(currentUrl, { syncInput: true });
     } catch (error) {
-      closeQrContextMenu();
-      mainElements.genOutput.classList.add('hidden');
-      state.generatedText = null;
+      clearGeneratedCode();
       showGenerateStatus(
         error instanceof Error ? error.message : translate('currentUrlFailed'),
       );

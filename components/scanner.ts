@@ -168,6 +168,21 @@ export class QRScanner {
     }
   }
 
+  async scanImageBlob(blob: Blob): Promise<string | null> {
+    if (typeof createImageBitmap === 'function') {
+      const bitmap = await createImageBitmap(blob);
+
+      try {
+        return await this.scanImageSource(bitmap, bitmap.width, bitmap.height);
+      } finally {
+        bitmap.close();
+      }
+    }
+
+    const image = await this.loadImageElement(blob);
+    return this.scanImageSource(image, image.naturalWidth, image.naturalHeight);
+  }
+
   private createBarcodeDetector(): BarcodeDetectorLike | null {
     if (!('BarcodeDetector' in globalThis)) {
       return null;
@@ -421,13 +436,43 @@ export class QRScanner {
     return null;
   }
 
-  private async tryDecodeWithBarcodeDetector(video: HTMLVideoElement): Promise<string | null> {
+  private async scanImageSource(
+    source: CanvasImageSource,
+    sourceWidth: number,
+    sourceHeight: number,
+  ): Promise<string | null> {
+    if (sourceWidth <= 0 || sourceHeight <= 0) {
+      return null;
+    }
+
+    const nativeResult = await this.tryDecodeWithBarcodeDetector(source);
+    if (nativeResult) {
+      return nativeResult;
+    }
+
+    for (let passIndex = 0; passIndex < 4; passIndex += 1) {
+      const regions = this.buildScanRegions(sourceWidth, sourceHeight, passIndex);
+      for (const region of regions) {
+        const canvas = this.drawRegionToCanvas(source, region);
+        const decodedText = this.tryDecodeWithZxing(canvas);
+        if (decodedText) {
+          return decodedText;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  private async tryDecodeWithBarcodeDetector(
+    source: CanvasImageSource,
+  ): Promise<string | null> {
     if (!this.barcodeDetector) {
       return null;
     }
 
     try {
-      const results = await this.barcodeDetector.detect(video);
+      const results = await this.barcodeDetector.detect(source);
       return results[0]?.rawValue ?? null;
     } catch {
       return null;
@@ -506,7 +551,7 @@ export class QRScanner {
     });
   }
 
-  private drawRegionToCanvas(video: HTMLVideoElement, region: ScanRegion): HTMLCanvasElement {
+  private drawRegionToCanvas(source: CanvasImageSource, region: ScanRegion): HTMLCanvasElement {
     const canvas = this.ensureScanCanvas(region.width, region.height);
     const context = this.scanContext;
 
@@ -528,7 +573,7 @@ export class QRScanner {
 
     context.clearRect(0, 0, canvas.width, canvas.height);
     context.drawImage(
-      video,
+      source,
       region.x,
       region.y,
       region.width,
@@ -540,6 +585,29 @@ export class QRScanner {
     );
 
     return canvas;
+  }
+
+  private loadImageElement(blob: Blob): Promise<HTMLImageElement> {
+    return new Promise((resolve, reject) => {
+      const imageUrl = URL.createObjectURL(blob);
+      const image = new Image();
+
+      const cleanup = () => {
+        URL.revokeObjectURL(imageUrl);
+      };
+
+      image.onload = () => {
+        cleanup();
+        resolve(image);
+      };
+
+      image.onerror = () => {
+        cleanup();
+        reject(new Error('Failed to load the selected image.'));
+      };
+
+      image.src = imageUrl;
+    });
   }
 
   private ensureScanCanvas(frameWidth: number, frameHeight: number): HTMLCanvasElement {

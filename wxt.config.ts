@@ -4,7 +4,7 @@ import tailwindcss from '@tailwindcss/vite'
 // See https://wxt.dev/api/config.html
 export default defineConfig({
   manifest: {
-    permissions: ['activeTab', 'clipboardWrite', 'storage'],
+    permissions: ['activeTab', 'clipboardRead', 'clipboardWrite', 'storage'],
   },
   vite: () => ({
     plugins: [tailwindcss()],
