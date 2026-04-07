@@ -4,17 +4,17 @@ import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
 
 const projectRoot = fileURLToPath(new URL('.', import.meta.url));
+const srcRoot = resolve(projectRoot, 'src');
 
 export default defineConfig({
-  root: resolve(projectRoot, 'entrypoints/popup'),
   publicDir: resolve(projectRoot, 'public'),
   plugins: [tailwindcss()],
   resolve: {
     alias: {
-      '@': projectRoot,
-      '~': projectRoot,
-      '@@': projectRoot,
-      '~~': projectRoot,
+      '@': srcRoot,
+      '~': srcRoot,
+      '@@': srcRoot,
+      '~~': srcRoot,
     },
   },
   build: {

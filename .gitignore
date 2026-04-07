@@ -8,13 +8,10 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-.output
 dist
 stats.html
 stats-*.json
-.wxt
 .wrangler
-web-ext.config.ts
 
 # Editor directories and files
 .vscode/*

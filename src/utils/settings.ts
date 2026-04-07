@@ -1,39 +1,43 @@
-import { getBrowserApi } from '@/utils/runtime';
-
 export type SupportedLocale = 'zh-CN' | 'en';
 export type SupportedTheme = 'emerald' | 'dracula';
 
-export interface ExtensionSettings {
+export interface AppSettings {
   locale: SupportedLocale;
   theme: SupportedTheme;
   onboardingCompleted: boolean;
 }
 
-const SETTINGS_KEY = 'extension-settings';
+const APP_SETTINGS_KEY = 'app-settings';
+const LEGACY_SETTINGS_KEY = 'extension-settings';
 
-function readFallbackSettings(): Partial<ExtensionSettings> {
+function parseStoredSettings(raw: string | null): Partial<AppSettings> {
+  if (!raw) {
+    return {};
+  }
+
   try {
-    const raw = window.localStorage.getItem(SETTINGS_KEY);
-    if (!raw) {
-      return {};
-    }
-
     const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object') {
-      return {};
-    }
-
-    return parsed as Partial<ExtensionSettings>;
+    return parsed && typeof parsed === 'object' ? (parsed as Partial<AppSettings>) : {};
   } catch {
     return {};
   }
 }
 
-function writeFallbackSettings(settings: ExtensionSettings) {
+function readStoredSettings(): Partial<AppSettings> {
+  const currentSettings = parseStoredSettings(window.localStorage.getItem(APP_SETTINGS_KEY));
+  if (Object.keys(currentSettings).length > 0) {
+    return currentSettings;
+  }
+
+  return parseStoredSettings(window.localStorage.getItem(LEGACY_SETTINGS_KEY));
+}
+
+function writeStoredSettings(settings: AppSettings) {
   try {
-    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    window.localStorage.setItem(APP_SETTINGS_KEY, JSON.stringify(settings));
+    window.localStorage.removeItem(LEGACY_SETTINGS_KEY);
   } catch {
-    // Ignore storage fallback failures.
+    // Ignore localStorage failures.
   }
 }
 
@@ -57,22 +61,8 @@ export function getInitialLocale(): SupportedLocale {
   return navigator.language.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en';
 }
 
-export async function getExtensionSettings(): Promise<Partial<ExtensionSettings>> {
-  let stored: unknown;
-  const browserApi = getBrowserApi();
-
-  if (browserApi?.storage?.local) {
-    const result = await browserApi.storage.local.get(SETTINGS_KEY);
-    stored = result[SETTINGS_KEY];
-  } else {
-    stored = readFallbackSettings();
-  }
-
-  if (!stored || typeof stored !== 'object') {
-    return {};
-  }
-
-  const settings = stored as Partial<ExtensionSettings>;
+export async function getAppSettings(): Promise<Partial<AppSettings>> {
+  const settings = readStoredSettings();
 
   return {
     locale: isSupportedLocale(settings.locale) ? settings.locale : undefined,
@@ -84,8 +74,8 @@ export async function getExtensionSettings(): Promise<Partial<ExtensionSettings>
   };
 }
 
-export async function getResolvedSettings(): Promise<ExtensionSettings> {
-  const stored = await getExtensionSettings();
+export async function getResolvedSettings(): Promise<AppSettings> {
+  const stored = await getAppSettings();
 
   return {
     locale: stored.locale ?? getInitialLocale(),
@@ -94,12 +84,11 @@ export async function getResolvedSettings(): Promise<ExtensionSettings> {
   };
 }
 
-export async function saveExtensionSettings(
-  partial: Partial<ExtensionSettings>,
-): Promise<ExtensionSettings> {
+export async function saveAppSettings(
+  partial: Partial<AppSettings>,
+): Promise<AppSettings> {
   const current = await getResolvedSettings();
-  const browserApi = getBrowserApi();
-  const next: ExtensionSettings = {
+  const next: AppSettings = {
     locale: isSupportedLocale(partial.locale) ? partial.locale : current.locale,
     theme: isSupportedTheme(partial.theme) ? partial.theme : current.theme,
     onboardingCompleted:
@@ -108,13 +97,6 @@ export async function saveExtensionSettings(
         : current.onboardingCompleted,
   };
 
-  if (browserApi?.storage?.local) {
-    await browserApi.storage.local.set({
-      [SETTINGS_KEY]: next,
-    });
-  } else {
-    writeFallbackSettings(next);
-  }
-
+  writeStoredSettings(next);
   return next;
 }

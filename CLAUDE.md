@@ -4,53 +4,47 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-WXT-based browser extension for QR code scanning and generation. Currently in early stage — built from the WXT starter template with the core QR features to be implemented.
+Vite-based web app for QR code scanning and generation. The app runs entirely in the browser and can be deployed as a static site to Cloudflare.
 
 ## Commands
 
 ```bash
-# Development (hot-reload)
-npm run dev            # Chrome/Edge
-npm run dev:firefox    # Firefox
+# Development
+npm run dev
 
 # Build
-npm run build          # Chrome/Edge
-npm run build:firefox  # Firefox
+npm run build
 
-# Package for distribution
-npm run zip            # Chrome/Edge
-npm run zip:firefox    # Firefox
+# Preview production build
+npm run preview
 
 # Type checking
 npm run compile
+
+# Deploy static assets to Cloudflare
+npm run deploy
 ```
 
 ## Architecture
 
-This project follows the [WXT framework](https://wxt.dev/) conventions:
+This project follows standard Vite conventions:
 
-- **`entrypoints/`** — Each file/folder becomes a browser extension entry point. WXT auto-generates the manifest from these.
-  - `background.ts` — Background service worker (`defineBackground()`)
-  - `content.ts` — Content script injected into pages (`defineContentScript()`)
-  - `popup/` — Browser action popup UI (HTML + TS + CSS)
-- **`components/`** — Shared reusable components
+- **`src/`** — Main web application source
+  - `main.ts` — App bootstrap and UI behavior
+  - `templates.ts` — HTML template rendering
+  - `style.css` — Tailwind and app-specific styles
+  - `components/` — QR generation and scanning logic
+  - `utils/` — i18n, storage, and browser helpers
 - **`public/`** — Static assets copied as-is (icons, etc.)
-- **`assets/`** — Assets processed by the bundler
-
-## WXT Specifics
-
-- Auto-imports are enabled — `browser`, `defineBackground()`, `defineContentScript()`, `storage`, and UI helpers (`createShadowRootUi`, `createIntegratedUi`, `createIframeUi`) are globally available without imports.
-- Path aliases: `@/`, `~/`, `@@/`, `~~/` all resolve to the project root.
-- Manifest is generated automatically — do not create `manifest.json` manually. Configure manifest fields in `wxt.config.ts`.
-- Build output goes to `.output/` (gitignored).
-- The `.wxt/` directory contains generated types and config — do not edit manually.
+- **`assets/`** — Repository assets such as screenshots
+- **`wrangler.jsonc`** — Cloudflare static deployment config for `dist/`
 
 ## Tech Stack
 
 - TypeScript (strict mode) with ESNext target
-- WXT (Vite-based build system)
+- Vite
 - Vanilla TS (no UI framework currently)
-- Multi-browser: Chrome/Edge default, Firefox via `:firefox` script variants
+- Cloudflare Wrangler for static deployment
 
 ## The rule that must be followed
 

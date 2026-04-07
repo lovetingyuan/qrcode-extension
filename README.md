@@ -1,6 +1,18 @@
 # qrcode-extension
 
-一个基于 WXT 的浏览器二维码扩展，支持在弹窗中生成二维码、扫描二维码，并提供当前网址生成、结果复制与图片下载等基础能力。
+一个基于 Vite 的二维码 Web 应用，支持在浏览器中生成二维码、摄像头扫码、本地图片扫码、剪贴板图片扫码，以及本地语言和主题设置持久化。
+
+## Commands
+
+```bash
+npm run dev
+npm run build
+npm run preview
+npm run compile
+npm run deploy
+```
+
+`deploy` 会先构建 `dist/`，再通过 `wrangler.jsonc` 发布到 Cloudflare。
 
 在线体验 [website](https://qrcode.tingyuan.in)
 

@@ -1,23 +1,13 @@
 import './style.css';
-import { generateQRCode } from '@/components/generator';
-import {
-  QRScanner,
-  type CameraPermissionMode,
-  type QRScannerError,
-} from '@/components/scanner';
+import { QRCodeGenerationError, generateQRCode } from '@/components/generator';
+import { QRScanner, type QRScannerError } from '@/components/scanner';
 import { t, type TranslationKey } from '@/utils/i18n';
-import {
-  getActiveTabUrl,
-  getAppRuntimeKind,
-  getBrowserApi,
-  openUrl,
-  type BrowserApi,
-} from '@/utils/runtime';
+import { openUrl } from '@/utils/runtime';
 import {
   getInitialLocale,
   getResolvedSettings,
   normalizeLocale,
-  saveExtensionSettings,
+  saveAppSettings,
   type SupportedLocale,
   type SupportedTheme,
 } from '@/utils/settings';
@@ -29,29 +19,19 @@ const THEME_META_COLORS: Record<SupportedTheme, string> = {
   emerald: '#0b5d4c',
   dracula: '#282a36',
 };
-const runtimeKind = getAppRuntimeKind();
-const browserApi = getBrowserApi();
-const scannerPermissionMode: CameraPermissionMode =
-  runtimeKind === 'extension' ? 'extension-page' : 'inline';
-const scanner = new QRScanner('qr-reader', {
-  permissionMode: scannerPermissionMode,
-});
+const scanner = new QRScanner('qr-reader');
 
 type GenerateStatusType = 'success' | 'info' | 'error';
 type MainTab = 'generate' | 'scan';
-type BrowserClipboardApi = BrowserApi & {
-  clipboard?: {
-    setImageData?: (imageData: ArrayBuffer, imageType: 'png' | 'jpeg') => Promise<void>;
-  };
-};
 
-interface PopupState {
+interface AppState {
   locale: SupportedLocale;
   theme: SupportedTheme;
   onboardingCompleted: boolean;
   selectedTab: MainTab;
   genInputText: string;
   generatedText: string | null;
+  isQrDialogOpen: boolean;
   scanResultText: string | null;
 }
 
@@ -67,6 +47,8 @@ interface MainElements {
   scannerLoading: HTMLDivElement;
   qrReader: HTMLDivElement;
   scanStatus: HTMLDivElement;
+  scanStatusText: HTMLSpanElement;
+  scanStatusCloseBtn: HTMLButtonElement;
   scanResult: HTMLDivElement;
   resultText: HTMLDivElement;
   copyBtn: HTMLButtonElement;
@@ -74,9 +56,10 @@ interface MainElements {
   genInput: HTMLTextAreaElement;
   genClearBtn: HTMLButtonElement;
   genBtn: HTMLButtonElement;
-  genCurrentUrlBtn: HTMLButtonElement | null;
   genStatus: HTMLDivElement;
-  genOutput: HTMLDivElement;
+  qrDialog: HTMLDialogElement;
+  qrDialogBox: HTMLDivElement;
+  qrFullscreenBtn: HTMLButtonElement;
   qrCanvasStage: HTMLDivElement;
   qrCanvas: HTMLCanvasElement;
   qrContextMenu: HTMLUListElement;
@@ -86,13 +69,14 @@ interface MainElements {
   tabs: HTMLInputElement[];
 }
 
-const state: PopupState = {
+const state: AppState = {
   locale: getInitialLocale(),
   theme: 'emerald',
   onboardingCompleted: false,
   selectedTab: 'generate',
   genInputText: '',
   generatedText: null,
+  isQrDialogOpen: false,
   scanResultText: null,
 };
 
@@ -116,21 +100,10 @@ function isValidUrl(text: string): boolean {
   }
 }
 
-function isSupportedTabUrl(url: string): boolean {
-  try {
-    const parsedUrl = new URL(url);
-    return parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:';
-  } catch {
-    return false;
-  }
-}
-
 function updateDocumentMetadata(title: string) {
   document.documentElement.lang = state.locale;
-  document.title = title;
-  document.documentElement.dataset.runtime = runtimeKind;
   document.documentElement.dataset.theme = state.theme;
-  document.body.dataset.runtime = runtimeKind;
+  document.title = title;
 
   const themeColorMeta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
   themeColorMeta?.setAttribute('content', THEME_META_COLORS[state.theme]);
@@ -153,13 +126,18 @@ function showStatus(message: string, type: 'info' | 'warning' | 'error') {
     return;
   }
 
-  mainElements.scanStatus.className = `alert alert-${type} text-sm`;
-  mainElements.scanStatus.textContent = message;
+  mainElements.scanStatus.className = `alert alert-${type} relative text-sm pr-10`;
+  mainElements.scanStatusText.textContent = message;
   mainElements.scanStatus.classList.remove('hidden');
 }
 
 function hideStatus() {
-  mainElements?.scanStatus.classList.add('hidden');
+  if (!mainElements) {
+    return;
+  }
+
+  mainElements.scanStatus.classList.add('hidden');
+  mainElements.scanStatusText.textContent = '';
 }
 
 function showGenerateStatus(message: string, type: GenerateStatusType = 'error') {
@@ -177,13 +155,32 @@ function showGenerateStatus(message: string, type: GenerateStatusType = 'error')
   hideGenerateStatusTimer = null;
 }
 
+function resolveGenerateErrorMessage(
+  error: unknown,
+  fallbackKey: TranslationKey,
+  options?: { preserveErrorMessage?: boolean },
+) {
+  if (error instanceof QRCodeGenerationError && error.code === 'data-too-large') {
+    return translate('generateTooLarge');
+  }
+
+  if (options?.preserveErrorMessage && error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return translate(fallbackKey);
+}
+
 function hideGenerateStatus() {
   if (hideGenerateStatusTimer !== null) {
     window.clearTimeout(hideGenerateStatusTimer);
     hideGenerateStatusTimer = null;
   }
 
-  mainElements?.genStatus.classList.add('hidden');
+  if (mainElements) {
+    mainElements.genStatus.classList.add('hidden');
+    mainElements.genStatus.textContent = '';
+  }
 }
 
 function updateGenerateButtonState() {
@@ -201,13 +198,82 @@ function closeQrContextMenu() {
   mainElements?.qrContextMenu.classList.add('hidden');
 }
 
-function clearGeneratedCode() {
+function openQrDialog() {
   if (!mainElements) {
     return;
   }
 
+  state.isQrDialogOpen = true;
+
+  if (!mainElements.qrDialog.open) {
+    mainElements.qrDialog.showModal();
+  }
+}
+
+function closeQrDialog() {
+  if (!mainElements) {
+    state.isQrDialogOpen = false;
+    return;
+  }
+
   closeQrContextMenu();
-  mainElements.genOutput.classList.add('hidden');
+  state.isQrDialogOpen = false;
+
+  if (mainElements.qrDialog.open) {
+    mainElements.qrDialog.close();
+  }
+
+  if (isQrDialogFullscreen()) {
+    void document.exitFullscreen();
+  }
+}
+
+function isQrDialogFullscreen() {
+  return !!mainElements && document.fullscreenElement === mainElements.qrDialogBox;
+}
+
+function syncQrFullscreenButton() {
+  if (!mainElements) {
+    return;
+  }
+
+  const isFullscreen = isQrDialogFullscreen();
+  const label = translate(isFullscreen ? 'exitFullscreen' : 'enterFullscreen');
+  mainElements.qrFullscreenBtn.setAttribute('aria-label', label);
+  mainElements.qrFullscreenBtn.setAttribute('title', label);
+  mainElements.qrFullscreenBtn.classList.toggle('btn-active', isFullscreen);
+}
+
+async function toggleQrFullscreen() {
+  if (!mainElements) {
+    return;
+  }
+
+  try {
+    if (isQrDialogFullscreen()) {
+      await document.exitFullscreen();
+    } else if (typeof mainElements.qrDialogBox.requestFullscreen === 'function') {
+      await mainElements.qrDialogBox.requestFullscreen();
+    } else {
+      throw new Error(translate('fullscreenFailed'));
+    }
+  } catch (error) {
+    showGenerateStatus(
+      error instanceof Error && error.message ? error.message : translate('fullscreenFailed'),
+    );
+  } finally {
+    syncQrFullscreenButton();
+  }
+}
+
+function clearGeneratedCode() {
+  if (!mainElements) {
+    state.generatedText = null;
+    state.isQrDialogOpen = false;
+    return;
+  }
+
+  closeQrDialog();
   state.generatedText = null;
 
   const context = mainElements.qrCanvas.getContext('2d');
@@ -220,12 +286,7 @@ function clearGeneratedCode() {
 }
 
 function hasGeneratedQrCode() {
-  return (
-    !!mainElements &&
-    !mainElements.genOutput.classList.contains('hidden') &&
-    mainElements.qrCanvas.width > 0 &&
-    mainElements.qrCanvas.height > 0
-  );
+  return !!mainElements && mainElements.qrCanvas.width > 0 && mainElements.qrCanvas.height > 0;
 }
 
 function openQrContextMenu(event: MouseEvent) {
@@ -279,13 +340,6 @@ async function copyQrImageToClipboard() {
 
   if (navigator.clipboard?.write && typeof ClipboardItem !== 'undefined') {
     await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-    return;
-  }
-
-  const clipboardApi = (browserApi as BrowserClipboardApi | undefined)?.clipboard;
-  if (clipboardApi?.setImageData) {
-    const buffer = await blob.arrayBuffer();
-    await clipboardApi.setImageData(buffer, 'png');
     return;
   }
 
@@ -467,9 +521,7 @@ function handleScannerError(error: QRScannerError) {
   const message =
     error.code === 'permission-denied'
       ? translate('permissionDenied')
-      : error.code === 'permission-required'
-        ? translate('permissionRequired')
-        : translate('cameraStartFailed', { detail: error.detail });
+      : translate('cameraStartFailed', { detail: error.detail });
 
   showStatus(message, 'error');
 }
@@ -517,7 +569,10 @@ async function getClipboardImageBlob(): Promise<Blob> {
   throw new Error(translate('scanClipboardEmpty'));
 }
 
-async function renderGeneratedCode(text: string, options?: { syncInput?: boolean }) {
+async function renderGeneratedCode(
+  text: string,
+  options?: { syncInput?: boolean; openDialog?: boolean },
+) {
   if (!mainElements) {
     return;
   }
@@ -533,7 +588,10 @@ async function renderGeneratedCode(text: string, options?: { syncInput?: boolean
   updateGenerateButtonState();
   hideGenerateStatus();
   await generateQRCode(mainElements.qrCanvas, text);
-  mainElements.genOutput.classList.remove('hidden');
+
+  if (options?.openDialog ?? true) {
+    openQrDialog();
+  }
 }
 
 async function syncCameraPermissionHint() {
@@ -564,6 +622,8 @@ function getMainElements(): MainElements {
     scannerLoading: document.querySelector<HTMLDivElement>('#scanner-loading')!,
     qrReader: document.querySelector<HTMLDivElement>('#qr-reader')!,
     scanStatus: document.querySelector<HTMLDivElement>('#scan-status')!,
+    scanStatusText: document.querySelector<HTMLSpanElement>('#scan-status-text')!,
+    scanStatusCloseBtn: document.querySelector<HTMLButtonElement>('#scan-status-close-btn')!,
     scanResult: document.querySelector<HTMLDivElement>('#scan-result')!,
     resultText: document.querySelector<HTMLDivElement>('#result-text')!,
     copyBtn: document.querySelector<HTMLButtonElement>('#copy-btn')!,
@@ -571,9 +631,10 @@ function getMainElements(): MainElements {
     genInput: document.querySelector<HTMLTextAreaElement>('#gen-input')!,
     genClearBtn: document.querySelector<HTMLButtonElement>('#gen-clear-btn')!,
     genBtn: document.querySelector<HTMLButtonElement>('#gen-btn')!,
-    genCurrentUrlBtn: document.querySelector<HTMLButtonElement>('#gen-current-url-btn'),
     genStatus: document.querySelector<HTMLDivElement>('#gen-status')!,
-    genOutput: document.querySelector<HTMLDivElement>('#gen-output')!,
+    qrDialog: document.querySelector<HTMLDialogElement>('#qr-dialog')!,
+    qrDialogBox: document.querySelector<HTMLDivElement>('#qr-dialog-box')!,
+    qrFullscreenBtn: document.querySelector<HTMLButtonElement>('#qr-fullscreen-btn')!,
     qrCanvasStage: document.querySelector<HTMLDivElement>('#qr-canvas-stage')!,
     qrCanvas: document.querySelector<HTMLCanvasElement>('#qr-canvas')!,
     qrContextMenu: document.querySelector<HTMLUListElement>('#qr-context-menu')!,
@@ -592,6 +653,7 @@ function syncMainViewFromState() {
   mainElements.genInput.value = state.genInputText;
   updateGenerateButtonState();
   setScanButtonState(scanning);
+  syncQrFullscreenButton();
 
   if (state.scanResultText) {
     showScanResult(state.scanResultText);
@@ -625,6 +687,10 @@ function bindGlobalListeners() {
     }
   });
 
+  document.addEventListener('fullscreenchange', () => {
+    syncQrFullscreenButton();
+  });
+
   globalListenersBound = true;
 }
 
@@ -633,19 +699,21 @@ async function bindMainViewEvents() {
     return;
   }
 
-  mainElements.themeToggleBtn.addEventListener('click', async () => {
+  const elements = mainElements;
+
+  elements.themeToggleBtn.addEventListener('click', async () => {
     state.theme = state.theme === 'dracula' ? 'emerald' : 'dracula';
-    await saveExtensionSettings({ theme: state.theme });
+    await saveAppSettings({ theme: state.theme });
     await renderMainView();
   });
 
-  mainElements.languageSelect.addEventListener('change', async () => {
-    state.locale = normalizeLocale(mainElements?.languageSelect.value);
-    await saveExtensionSettings({ locale: state.locale });
+  elements.languageSelect.addEventListener('change', async () => {
+    state.locale = normalizeLocale(elements.languageSelect.value);
+    await saveAppSettings({ locale: state.locale });
     await renderMainView();
   });
 
-  mainElements.scanBtn.addEventListener('click', async () => {
+  elements.scanBtn.addEventListener('click', async () => {
     if (!mainElements) {
       return;
     }
@@ -658,7 +726,7 @@ async function bindMainViewEvents() {
 
     clearScanResult();
     hideStatus();
-    mainElements.scannerContainer.classList.remove('hidden');
+    elements.scannerContainer.classList.remove('hidden');
     watchScannerVideoReady();
     scanning = true;
     setScanButtonState(true);
@@ -676,7 +744,7 @@ async function bindMainViewEvents() {
         resetScannerPreviewAspectRatio();
         scanning = false;
         setScanButtonState(false);
-        mainElements.scannerContainer.classList.add('hidden');
+        elements.scannerContainer.classList.add('hidden');
         hideStatus();
         showScanResult(decodedText);
       },
@@ -686,19 +754,19 @@ async function bindMainViewEvents() {
     await syncCameraPermissionHint();
   });
 
-  mainElements.scanLocalImageBtn.addEventListener('click', async () => {
+  elements.scanLocalImageBtn.addEventListener('click', async () => {
     if (!mainElements) {
       return;
     }
 
     await stopScanner();
     hideStatus();
-    mainElements.scanImageInput.value = '';
-    mainElements.scanImageInput.click();
+    elements.scanImageInput.value = '';
+    elements.scanImageInput.click();
   });
 
-  mainElements.scanImageInput.addEventListener('change', async () => {
-    const file = mainElements?.scanImageInput.files?.[0];
+  elements.scanImageInput.addEventListener('change', async () => {
+    const file = elements.scanImageInput.files?.[0];
     if (!file) {
       return;
     }
@@ -713,14 +781,13 @@ async function bindMainViewEvents() {
         'error',
       );
     } finally {
-      if (mainElements) {
-        mainElements.scanImageInput.value = '';
-      }
+      elements.scanImageInput.value = '';
     }
   });
 
-  mainElements.scanClipboardBtn.addEventListener('click', async () => {
+  elements.scanClipboardBtn.addEventListener('click', async () => {
     await stopScanner();
+    clearScanResult();
     hideStatus();
     showStatus(translate('scanClipboardLoading'), 'info');
 
@@ -735,23 +802,21 @@ async function bindMainViewEvents() {
     }
   });
 
-  mainElements.copyBtn.addEventListener('click', async () => {
+  elements.copyBtn.addEventListener('click', async () => {
     if (!mainElements || !state.scanResultText) {
       return;
     }
 
     try {
       await navigator.clipboard.writeText(state.scanResultText);
-      mainElements.copyBtn.textContent = translate('copiedText');
+      elements.copyBtn.textContent = translate('copiedText');
 
       if (resetCopyButtonTimer !== null) {
         window.clearTimeout(resetCopyButtonTimer);
       }
 
       resetCopyButtonTimer = window.setTimeout(() => {
-        if (mainElements) {
-          mainElements.copyBtn.textContent = translate('copyText');
-        }
+        elements.copyBtn.textContent = translate('copyText');
       }, 1500);
     } catch (error) {
       showStatus(translate('copyFailed'), 'error');
@@ -759,45 +824,37 @@ async function bindMainViewEvents() {
     }
   });
 
-  mainElements.openBtn.addEventListener('click', () => {
+  elements.scanStatusCloseBtn.addEventListener('click', () => {
+    hideStatus();
+  });
+
+  elements.openBtn.addEventListener('click', () => {
     if (state.scanResultText && isValidUrl(state.scanResultText)) {
       void openUrl(state.scanResultText);
     }
   });
 
-  mainElements.genInput.addEventListener('input', () => {
-    if (!mainElements) {
-      return;
-    }
-
-    state.genInputText = mainElements.genInput.value;
-    if (!mainElements.genInput.value.trim()) {
+  elements.genInput.addEventListener('input', () => {
+    state.genInputText = elements.genInput.value;
+    if (!elements.genInput.value.trim()) {
       clearGeneratedCode();
       hideGenerateStatus();
     }
     updateGenerateButtonState();
   });
 
-  mainElements.genClearBtn.addEventListener('click', () => {
-    if (!mainElements) {
-      return;
-    }
-
-    mainElements.genInput.value = '';
+  elements.genClearBtn.addEventListener('click', () => {
+    elements.genInput.value = '';
     state.genInputText = '';
     clearGeneratedCode();
     updateGenerateButtonState();
     hideGenerateStatus();
-    mainElements.genInput.focus();
+    elements.genInput.focus();
   });
 
-  mainElements.genBtn.addEventListener('click', async () => {
-    if (!mainElements) {
-      return;
-    }
-
-    const text = mainElements.genInput.value.trim();
-    state.genInputText = mainElements.genInput.value;
+  elements.genBtn.addEventListener('click', async () => {
+    const text = elements.genInput.value.trim();
+    state.genInputText = elements.genInput.value;
 
     if (!text) {
       return;
@@ -807,53 +864,36 @@ async function bindMainViewEvents() {
       await renderGeneratedCode(text);
     } catch (error) {
       clearGeneratedCode();
-      showGenerateStatus(translate('generateFailed'));
+      showGenerateStatus(resolveGenerateErrorMessage(error, 'generateFailed'));
       console.error('QR generation failed:', error);
     }
   });
 
-  mainElements.genCurrentUrlBtn?.addEventListener('click', async () => {
-    if (!mainElements) {
-      return;
-    }
+  elements.qrCanvas.addEventListener('contextmenu', openQrContextMenu);
+  elements.qrFullscreenBtn.addEventListener('click', async () => {
+    await toggleQrFullscreen();
+  });
+  elements.qrDialog.addEventListener('close', () => {
+    closeQrContextMenu();
+    state.isQrDialogOpen = false;
 
-    try {
-      const currentUrl = await getActiveTabUrl();
-
-      if (!currentUrl) {
-        throw new Error(translate('currentUrlMissing'));
-      }
-
-      if (!isSupportedTabUrl(currentUrl)) {
-        throw new Error(translate('currentUrlUnsupported'));
-      }
-
-      await renderGeneratedCode(currentUrl, { syncInput: true });
-    } catch (error) {
-      clearGeneratedCode();
-      showGenerateStatus(
-        error instanceof Error ? error.message : translate('currentUrlFailed'),
-      );
-      console.error('Current URL QR generation failed:', error);
+    if (isQrDialogFullscreen()) {
+      void document.exitFullscreen();
     }
   });
 
-  mainElements.qrCanvas.addEventListener('contextmenu', openQrContextMenu);
-
-  mainElements.copyImageBtn.addEventListener('click', async () => {
+  elements.copyImageBtn.addEventListener('click', async () => {
     closeQrContextMenu();
 
     try {
       await copyQrImageToClipboard();
     } catch (error) {
-      showGenerateStatus(
-        error instanceof Error ? error.message : translate('copyImageFailed'),
-      );
+      showGenerateStatus(error instanceof Error ? error.message : translate('copyImageFailed'));
       console.error('QR image copy failed:', error);
     }
   });
 
-  mainElements.downloadImageBtn.addEventListener('click', async () => {
+  elements.downloadImageBtn.addEventListener('click', async () => {
     closeQrContextMenu();
 
     try {
@@ -864,7 +904,7 @@ async function bindMainViewEvents() {
     }
   });
 
-  mainElements.tabs.forEach((tab) => {
+  elements.tabs.forEach((tab) => {
     tab.addEventListener('change', async () => {
       closeQrContextMenu();
       state.selectedTab = tab.dataset.tab === 'scan' ? 'scan' : 'generate';
@@ -881,10 +921,13 @@ async function bindMainViewEvents() {
 
   if (state.generatedText) {
     try {
-      await renderGeneratedCode(state.generatedText);
+      await renderGeneratedCode(state.generatedText, {
+        openDialog: state.isQrDialogOpen,
+      });
     } catch (error) {
       state.generatedText = null;
-      showGenerateStatus(translate('generateFailed'));
+      state.isQrDialogOpen = false;
+      showGenerateStatus(resolveGenerateErrorMessage(error, 'generateFailed'));
       console.error('Stored QR generation failed:', error);
     }
   }
@@ -893,11 +936,8 @@ async function bindMainViewEvents() {
 async function renderMainView() {
   await stopScanner();
   clearTimers();
-  updateDocumentMetadata(translate('popupTitle'));
-  app.innerHTML = renderMainTemplate(state.locale, state.theme, state.selectedTab, {
-    showCurrentUrlButton: runtimeKind === 'extension',
-    generateInputRows: runtimeKind === 'web' ? 6 : 4,
-  });
+  updateDocumentMetadata(translate('appTitle'));
+  app.innerHTML = renderMainTemplate(state.locale, state.theme, state.selectedTab);
   mainElements = getMainElements();
   resetScannerPreviewAspectRatio();
   await bindMainViewEvents();
@@ -906,7 +946,7 @@ async function renderMainView() {
 function renderOnboardingView() {
   mainElements = null;
   clearTimers();
-  updateDocumentMetadata(translate('popupTitle'));
+  updateDocumentMetadata(translate('appTitle'));
   app.innerHTML = renderOnboardingTemplate(state.locale);
 
   const languageSelect = document.querySelector<HTMLSelectElement>('#onboarding-language-select')!;
@@ -921,7 +961,7 @@ function renderOnboardingView() {
 
   confirmButton.addEventListener('click', async () => {
     state.onboardingCompleted = true;
-    await saveExtensionSettings({
+    await saveAppSettings({
       locale: state.locale,
       onboardingCompleted: true,
     });
