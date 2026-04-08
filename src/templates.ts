@@ -75,7 +75,7 @@ export function renderMainTemplate(
   theme: SupportedTheme,
   selectedTab: MainTab,
 ) {
-  const githubUrl = "https://github.com/lovetingyuan/qrcode-extension";
+  const githubUrl = "https://github.com/lovetingyuan/qrcode";
 
   return `
     <main class="flex w-full flex-col gap-4">

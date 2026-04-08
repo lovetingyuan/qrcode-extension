@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   // When using Workers Builds, this must match the Worker name in Cloudflare.
-  "name": "qrcode-extension",
+  "name": "qrcode",
   "compatibility_date": "2026-03-28",
   "assets": {
     "directory": "./dist",
