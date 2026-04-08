@@ -45,7 +45,7 @@ function renderThemeToggleButton(locale: SupportedLocale, theme: SupportedTheme)
 
 export function renderOnboardingTemplate(locale: SupportedLocale) {
   return `
-    <div class="flex min-h-[calc(100vh-36px)] w-full flex-col justify-center gap-5 pt-1 sm:min-h-[calc(100vh-52px)]">
+    <main class="flex min-h-[calc(100vh-36px)] w-full flex-col justify-center gap-5 pt-1 sm:min-h-[calc(100vh-52px)]">
       <div class="flex min-h-[280px] flex-col justify-between pt-1">
         <div class="space-y-8">
           <div class="space-y-2">
@@ -66,7 +66,7 @@ export function renderOnboardingTemplate(locale: SupportedLocale) {
 
         <button id="onboarding-confirm-btn" class="btn btn-primary mt-8 w-full sm:w-auto sm:self-start">${t(locale, 'confirmButton')}</button>
       </div>
-    </div>
+    </main>
   `
 }
 
@@ -78,7 +78,7 @@ export function renderMainTemplate(
   const githubUrl = 'https://github.com/lovetingyuan/qrcode-extension'
 
   return `
-    <div class="flex w-full flex-col gap-4">
+    <main class="flex w-full flex-col gap-4">
       <header class="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
         <div class="flex min-w-0 flex-1 items-center gap-3">
           <span
@@ -92,6 +92,13 @@ export function renderMainTemplate(
           </div>
         </div>
         <div class="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2">
+          <button
+            id="install-app-btn"
+            type="button"
+            class="btn btn-primary btn-xs hidden h-7 min-h-7 rounded-full px-3 text-[11px] font-semibold"
+          >
+            ${t(locale, 'installApp')}
+          </button>
           <a
             href="${githubUrl}"
             target="_blank"
@@ -120,6 +127,39 @@ export function renderMainTemplate(
       <div
         class="h-px bg-[linear-gradient(90deg,transparent,color-mix(in_srgb,var(--color-base-300)_88%,transparent)_12%,color-mix(in_srgb,var(--color-base-300)_88%,transparent)_88%,transparent)]"
       ></div>
+
+      <div
+        id="install-banner"
+        class="alert alert-info hidden items-start gap-3 border border-info/18 bg-info/10 px-4 py-3 text-sm text-left shadow-none"
+        role="status"
+      >
+        <div class="flex min-w-0 items-start gap-3">
+          <span class="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-info/16 text-info">
+            <svg viewBox="0 0 24 24" class="h-4 w-4 fill-current" aria-hidden="true">
+              <path d="M12 3.75a.75.75 0 0 1 .75.75v8.19l2.72-2.72a.75.75 0 1 1 1.06 1.06l-4 4a.75.75 0 0 1-1.06 0l-4-4a.75.75 0 1 1 1.06-1.06l2.72 2.72V4.5a.75.75 0 0 1 .75-.75Zm-6.25 13a.75.75 0 0 1 .75.75v.75h11v-.75a.75.75 0 0 1 1.5 0v1.5c0 .41-.34.75-.75.75H5.75a.75.75 0 0 1-.75-.75v-1.5a.75.75 0 0 1 .75-.75Z" />
+            </svg>
+          </span>
+          <span id="install-banner-text" class="min-w-0 flex-1 leading-5"></span>
+        </div>
+        <div class="ml-auto flex shrink-0 items-center gap-2 self-center">
+          <button
+            id="install-banner-action-btn"
+            type="button"
+            class="btn btn-primary btn-xs h-8 min-h-8 rounded-full px-3 sm:hidden"
+          >
+            ${t(locale, 'installApp')}
+          </button>
+          <button
+            id="install-banner-close-btn"
+            type="button"
+            class="btn btn-ghost btn-xs h-8 min-h-8 w-8 rounded-full p-0"
+            aria-label="${t(locale, 'dismissInstallHint')}"
+            title="${t(locale, 'dismissInstallHint')}"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
 
       <section >
         <div class="tabs tabs-border tabs-medium">
@@ -263,17 +303,59 @@ export function renderMainTemplate(
             </div>
             <div id="scan-result" class="hidden flex flex-col gap-2">
               <div
-                class="min-h-24 rounded-box border border-base-300/70 bg-base-100 px-4 py-3 break-all text-sm shadow-sm"
-                id="result-text"
-              ></div>
+                class="relative min-h-24 rounded-box border border-base-300/70 bg-base-100 px-4 py-3 pr-12 shadow-sm"
+              >
+                <button
+                  id="scan-result-close-btn"
+                  type="button"
+                  class="btn btn-ghost btn-xs absolute right-2 top-2 h-7 min-h-7 w-7 rounded-full p-0"
+                  aria-label="${t(locale, 'dismissScanResult')}"
+                  title="${t(locale, 'dismissScanResult')}"
+                >
+                  ✕
+                </button>
+                <div id="result-text" class="break-all text-sm"></div>
+              </div>
               <div class="flex gap-2">
                 <button id="copy-btn" class="btn btn-sm btn-outline flex-1">${t(locale, 'copyText')}</button>
-                <button id="open-btn" class="btn btn-sm btn-primary flex-1 hidden">${t(locale, 'openLink')}</button>
+                <button id="open-btn" class="btn btn-sm btn-secondary flex-1 hidden">${t(locale, 'openLink')}</button>
               </div>
             </div>
           </div>
         </div>
       </section>
-    </div>
+
+      <dialog id="install-dialog" class="modal">
+        <div class="modal-box relative max-w-sm">
+          <form method="dialog">
+            <button
+              type="submit"
+              class="btn btn-circle btn-ghost btn-sm absolute top-3 right-3"
+              aria-label="${t(locale, 'closeDialog')}"
+              title="${t(locale, 'closeDialog')}"
+            >
+              ✕
+            </button>
+          </form>
+          <div class="space-y-3 pr-8">
+            <h3 class="text-base font-semibold text-base-content">${t(locale, 'installDialogTitle')}</h3>
+            <p class="text-sm leading-6 text-base-content/75">${t(locale, 'installDialogDescription')}</p>
+            <ol class="list-inside list-decimal space-y-2 text-sm leading-6 text-base-content/85">
+              <li>${t(locale, 'installDialogStep1')}</li>
+              <li>${t(locale, 'installDialogStep2')}</li>
+              <li>${t(locale, 'installDialogStep3')}</li>
+            </ol>
+          </div>
+          <div class="modal-action">
+            <form method="dialog">
+              <button type="submit" class="btn btn-primary">${t(locale, 'installDialogAction')}</button>
+            </form>
+          </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+          <button type="submit">${t(locale, 'closeDialog')}</button>
+        </form>
+      </dialog>
+    </main>
   `
 }

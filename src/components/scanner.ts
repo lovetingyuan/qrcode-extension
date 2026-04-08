@@ -1,15 +1,8 @@
-import {
-  BarcodeFormat,
-  BinaryBitmap,
-  DecodeHintType,
-  HybridBinarizer,
-  MultiFormatReader,
-  RGBLuminanceSource,
-} from '@zxing/library';
-
 export type QRScannerError =
   | { code: 'permission-denied' }
   | { code: 'camera-start-failed'; detail: string };
+
+type ZxingQrDecoderModule = typeof import('@/components/scanner-zxing');
 
 interface ScanRegion {
   x: number;
@@ -38,6 +31,13 @@ type AdvancedTrackConstraints = MediaTrackConstraints & {
 const SCAN_INTERVAL_MS = 90;
 const MAX_DECODE_DIMENSION = 1440;
 const MAX_UPSCALE_FACTOR = 2.5;
+
+let zxingQrDecoderModulePromise: Promise<ZxingQrDecoderModule> | null = null;
+
+function loadZxingQrDecoderModule() {
+  zxingQrDecoderModulePromise ??= import('@/components/scanner-zxing');
+  return zxingQrDecoderModulePromise;
+}
 
 export class QRScanner {
   private elementId: string;
@@ -404,7 +404,7 @@ export class QRScanner {
       }
 
       const canvas = this.drawRegionToCanvas(video, region);
-      const decodedText = this.tryDecodeWithZxing(canvas);
+      const decodedText = await this.tryDecodeWithZxing(canvas);
       if (decodedText) {
         return decodedText;
       }
@@ -431,7 +431,7 @@ export class QRScanner {
       const regions = this.buildScanRegions(sourceWidth, sourceHeight, passIndex);
       for (const region of regions) {
         const canvas = this.drawRegionToCanvas(source, region);
-        const decodedText = this.tryDecodeWithZxing(canvas);
+        const decodedText = await this.tryDecodeWithZxing(canvas);
         if (decodedText) {
           return decodedText;
         }
@@ -606,63 +606,12 @@ export class QRScanner {
     return this.scanCanvas;
   }
 
-  private tryDecodeWithZxing(canvas: HTMLCanvasElement): string | null {
-    const context =
-      this.scanCanvas === canvas
-        ? this.scanContext
-        : canvas.getContext('2d', { willReadFrequently: true });
-
-    if (!context) {
-      return null;
-    }
-
+  private async tryDecodeWithZxing(canvas: HTMLCanvasElement): Promise<string | null> {
     try {
-      const hints = new Map();
-      hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.QR_CODE]);
-      hints.set(DecodeHintType.TRY_HARDER, true);
-
-      const reader = new MultiFormatReader();
-      reader.setHints(hints);
-
-      const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-      const luminanceSource = new RGBLuminanceSource(
-        this.toGrayscaleBuffer(imageData.data, this.invertNextZxingDecode),
-        canvas.width,
-        canvas.height,
-      );
-      const binaryBitmap = new BinaryBitmap(new HybridBinarizer(luminanceSource));
-      const result = reader.decode(binaryBitmap, hints);
-      reader.reset();
+      const { decodeQrCanvasWithZxing } = await loadZxingQrDecoderModule();
+      return decodeQrCanvasWithZxing(canvas, this.invertNextZxingDecode);
+    } finally {
       this.invertNextZxingDecode = !this.invertNextZxingDecode;
-
-      return result.getText();
-    } catch {
-      this.invertNextZxingDecode = !this.invertNextZxingDecode;
-      return null;
     }
-  }
-
-  private toGrayscaleBuffer(
-    imageBuffer: Uint8ClampedArray,
-    invert: boolean,
-  ): Uint8ClampedArray {
-    const grayscaleBuffer = new Uint8ClampedArray(imageBuffer.length / 4);
-
-    for (let i = 0, j = 0; i < imageBuffer.length; i += 4, j++) {
-      let gray = 0xff;
-      const alpha = imageBuffer[i + 3];
-
-      if (alpha !== 0) {
-        const pixelR = imageBuffer[i];
-        const pixelG = imageBuffer[i + 1];
-        const pixelB = imageBuffer[i + 2];
-
-        gray = (306 * pixelR + 601 * pixelG + 117 * pixelB + 0x200) >> 10;
-      }
-
-      grayscaleBuffer[j] = invert ? 0xff - gray : gray;
-    }
-
-    return grayscaleBuffer;
   }
 }

@@ -5,6 +5,7 @@ export interface AppSettings {
   locale: SupportedLocale;
   theme: SupportedTheme;
   onboardingCompleted: boolean;
+  installHintDismissed: boolean;
 }
 
 const APP_SETTINGS_KEY = 'app-settings';
@@ -71,6 +72,10 @@ export async function getAppSettings(): Promise<Partial<AppSettings>> {
       typeof settings.onboardingCompleted === 'boolean'
         ? settings.onboardingCompleted
         : undefined,
+    installHintDismissed:
+      typeof settings.installHintDismissed === 'boolean'
+        ? settings.installHintDismissed
+        : undefined,
   };
 }
 
@@ -81,6 +86,7 @@ export async function getResolvedSettings(): Promise<AppSettings> {
     locale: stored.locale ?? getInitialLocale(),
     theme: stored.theme ?? 'emerald',
     onboardingCompleted: stored.onboardingCompleted ?? false,
+    installHintDismissed: stored.installHintDismissed ?? false,
   };
 }
 
@@ -95,6 +101,10 @@ export async function saveAppSettings(
       typeof partial.onboardingCompleted === 'boolean'
         ? partial.onboardingCompleted
         : current.onboardingCompleted,
+    installHintDismissed:
+      typeof partial.installHintDismissed === 'boolean'
+        ? partial.installHintDismissed
+        : current.installHintDismissed,
   };
 
   writeStoredSettings(next);

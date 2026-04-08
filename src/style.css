@@ -29,7 +29,10 @@ html[data-theme='dracula'] {
 
 body {
   min-height: 100vh;
-  padding: 20px 16px 32px;
+  padding-top: max(20px, env(safe-area-inset-top));
+  padding-right: max(16px, env(safe-area-inset-right));
+  padding-bottom: max(32px, env(safe-area-inset-bottom));
+  padding-left: max(16px, env(safe-area-inset-left));
 }
 
 #app {
@@ -127,6 +130,9 @@ body {
 
 @media (max-width: 640px) {
   body {
-    padding: 12px 12px 24px;
+    padding-top: max(12px, env(safe-area-inset-top));
+    padding-right: max(12px, env(safe-area-inset-right));
+    padding-bottom: max(24px, env(safe-area-inset-bottom));
+    padding-left: max(12px, env(safe-area-inset-left));
   }
 }

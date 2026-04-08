@@ -1,8 +1,7 @@
 import './style.css';
-import { QRCodeGenerationError, generateQRCode } from '@/components/generator';
-import { QRScanner, type QRScannerError } from '@/components/scanner';
 import { t, type TranslationKey } from '@/utils/i18n';
 import { openUrl } from '@/utils/runtime';
+import { registerSW } from 'virtual:pwa-register';
 import {
   getInitialLocale,
   getResolvedSettings,
@@ -19,15 +18,34 @@ const THEME_META_COLORS: Record<SupportedTheme, string> = {
   emerald: '#0b5d4c',
   dracula: '#282a36',
 };
-const scanner = new QRScanner('qr-reader');
 
 type GenerateStatusType = 'success' | 'info' | 'error';
+type InstallMode = 'hidden' | 'ios' | 'native';
 type MainTab = 'generate' | 'scan';
+type QRScannerError =
+  | { code: 'permission-denied' }
+  | { code: 'camera-start-failed'; detail: string };
+type GeneratorModule = typeof import('@/components/generator');
+type ScannerModule = typeof import('@/components/scanner');
+type QRScannerController = InstanceType<ScannerModule['QRScanner']>;
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt(): Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+}
+
+interface NavigatorWithStandalone extends Navigator {
+  standalone?: boolean;
+}
 
 interface AppState {
   locale: SupportedLocale;
   theme: SupportedTheme;
   onboardingCompleted: boolean;
+  installHintDismissed: boolean;
+  installMode: InstallMode;
+  isInstallDialogOpen: boolean;
+  isInstalled: boolean;
   selectedTab: MainTab;
   genInputText: string;
   generatedText: string | null;
@@ -37,6 +55,12 @@ interface AppState {
 
 interface MainElements {
   languageSelect: HTMLSelectElement;
+  installAppBtn: HTMLButtonElement;
+  installBanner: HTMLDivElement;
+  installBannerText: HTMLSpanElement;
+  installBannerActionBtn: HTMLButtonElement;
+  installBannerCloseBtn: HTMLButtonElement;
+  installDialog: HTMLDialogElement;
   themeToggleBtn: HTMLButtonElement;
   scanBtn: HTMLButtonElement;
   scanLocalImageBtn: HTMLButtonElement;
@@ -50,6 +74,7 @@ interface MainElements {
   scanStatusText: HTMLSpanElement;
   scanStatusCloseBtn: HTMLButtonElement;
   scanResult: HTMLDivElement;
+  scanResultCloseBtn: HTMLButtonElement;
   resultText: HTMLDivElement;
   copyBtn: HTMLButtonElement;
   openBtn: HTMLButtonElement;
@@ -73,6 +98,10 @@ const state: AppState = {
   locale: getInitialLocale(),
   theme: 'emerald',
   onboardingCompleted: false,
+  installHintDismissed: false,
+  installMode: 'hidden',
+  isInstallDialogOpen: false,
+  isInstalled: false,
   selectedTab: 'generate',
   genInputText: '',
   generatedText: null,
@@ -86,6 +115,44 @@ let disposeVideoReadyWatcher: (() => void) | null = null;
 let hideGenerateStatusTimer: number | null = null;
 let resetCopyButtonTimer: number | null = null;
 let globalListenersBound = false;
+let installEventsBound = false;
+let scanRequestToken = 0;
+let generatorModulePromise: Promise<GeneratorModule> | null = null;
+let scannerModulePromise: Promise<ScannerModule> | null = null;
+let scannerInstance: QRScannerController | null = null;
+let deferredInstallPrompt: BeforeInstallPromptEvent | null = null;
+
+function loadGeneratorModule() {
+  generatorModulePromise ??= import('@/components/generator');
+  return generatorModulePromise;
+}
+
+function loadScannerModule() {
+  scannerModulePromise ??= import('@/components/scanner');
+  return scannerModulePromise;
+}
+
+async function getScanner() {
+  if (scannerInstance) {
+    return scannerInstance;
+  }
+
+  const { QRScanner } = await loadScannerModule();
+  scannerInstance = new QRScanner('qr-reader');
+  return scannerInstance;
+}
+
+async function checkCameraPermission(): Promise<PermissionState> {
+  try {
+    const result = await navigator.permissions.query({
+      name: 'camera' as PermissionName,
+    });
+    return result.state;
+  } catch {
+    // Firefox doesn't support querying camera permission
+    return 'prompt';
+  }
+}
 
 function translate(key: TranslationKey, params?: Record<string, string | number>) {
   return t(state.locale, key, params);
@@ -107,6 +174,55 @@ function updateDocumentMetadata(title: string) {
 
   const themeColorMeta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
   themeColorMeta?.setAttribute('content', THEME_META_COLORS[state.theme]);
+
+  const appleTitleMeta = document.querySelector<HTMLMetaElement>(
+    'meta[name="apple-mobile-web-app-title"]',
+  );
+  appleTitleMeta?.setAttribute('content', title);
+}
+
+function isIosDevice() {
+  const userAgent = navigator.userAgent;
+  return (
+    /iPad|iPhone|iPod/.test(userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  );
+}
+
+function isAndroidDevice() {
+  return /Android/i.test(navigator.userAgent);
+}
+
+function isMobileLikeDevice() {
+  return isIosDevice() || isAndroidDevice() || /Mobi|Mobile/i.test(navigator.userAgent);
+}
+
+function isStandaloneApp() {
+  return (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.matchMedia('(display-mode: fullscreen)').matches ||
+    (navigator as NavigatorWithStandalone).standalone === true
+  );
+}
+
+function resolveInstallMode(): InstallMode {
+  if (state.isInstalled || isStandaloneApp() || !isMobileLikeDevice()) {
+    return 'hidden';
+  }
+
+  if (isIosDevice()) {
+    return 'ios';
+  }
+
+  if (deferredInstallPrompt) {
+    return 'native';
+  }
+
+  return 'hidden';
+}
+
+function getInstallBannerCopy() {
+  return translate(state.installMode === 'ios' ? 'installBannerIos' : 'installBannerNative');
 }
 
 function clearTimers() {
@@ -160,7 +276,12 @@ function resolveGenerateErrorMessage(
   fallbackKey: TranslationKey,
   options?: { preserveErrorMessage?: boolean },
 ) {
-  if (error instanceof QRCodeGenerationError && error.code === 'data-too-large') {
+  if (
+    error instanceof Error &&
+    error.name === 'QRCodeGenerationError' &&
+    'code' in error &&
+    error.code === 'data-too-large'
+  ) {
     return translate('generateTooLarge');
   }
 
@@ -382,8 +503,13 @@ function clearScanResult() {
   }
 
   state.scanResultText = null;
+  if (resetCopyButtonTimer !== null) {
+    window.clearTimeout(resetCopyButtonTimer);
+    resetCopyButtonTimer = null;
+  }
   mainElements.resultText.textContent = '';
   mainElements.scanResult.classList.add('hidden');
+  mainElements.copyBtn.textContent = translate('copyText');
   mainElements.openBtn.classList.add('hidden');
 }
 
@@ -501,13 +627,14 @@ function watchScannerVideoReady() {
 }
 
 async function stopScanner() {
+  scanRequestToken += 1;
   disposeVideoReadyWatcher?.();
   disposeVideoReadyWatcher = null;
   setScannerLoading(false);
   resetScannerPreviewAspectRatio();
 
-  if (scanning) {
-    await scanner.stop();
+  if (scanning && scannerInstance) {
+    await scannerInstance.stop();
   }
 
   scanning = false;
@@ -532,6 +659,7 @@ async function decodeImageBlob(blob: Blob, loadingMessage: string) {
   showStatus(loadingMessage, 'info');
 
   try {
+    const scanner = await getScanner();
     const decodedText = await scanner.scanImageBlob(blob);
 
     if (!decodedText) {
@@ -587,6 +715,7 @@ async function renderGeneratedCode(
 
   updateGenerateButtonState();
   hideGenerateStatus();
+  const { generateQRCode } = await loadGeneratorModule();
   await generateQRCode(mainElements.qrCanvas, text);
 
   if (options?.openDialog ?? true) {
@@ -600,7 +729,7 @@ async function syncCameraPermissionHint() {
   }
 
   const cameraHint = mainElements.cameraHint;
-  const permissionState = await scanner.checkCameraPermission();
+  const permissionState = await checkCameraPermission();
 
   if (mainElements?.cameraHint !== cameraHint) {
     return;
@@ -609,9 +738,75 @@ async function syncCameraPermissionHint() {
   cameraHint.classList.toggle('hidden', permissionState === 'granted');
 }
 
+function syncInstallUi() {
+  if (!mainElements) {
+    return;
+  }
+
+  state.installMode = resolveInstallMode();
+  const shouldShowInstallButton = state.installMode !== 'hidden';
+  const shouldShowInstallBanner = shouldShowInstallButton && !state.installHintDismissed;
+
+  mainElements.installAppBtn.classList.toggle('hidden', !shouldShowInstallButton);
+  mainElements.installBanner.classList.toggle('hidden', !shouldShowInstallBanner);
+  mainElements.installBannerText.textContent = shouldShowInstallButton ? getInstallBannerCopy() : '';
+
+  if (!shouldShowInstallButton && mainElements.installDialog.open) {
+    mainElements.installDialog.close();
+  } else if (state.installMode === 'ios' && state.isInstallDialogOpen && !mainElements.installDialog.open) {
+    mainElements.installDialog.showModal();
+  }
+}
+
+function registerPwa() {
+  registerSW({ immediate: true });
+}
+
+function bindInstallEvents() {
+  if (installEventsBound) {
+    return;
+  }
+
+  window.addEventListener('beforeinstallprompt', (event) => {
+    event.preventDefault();
+    deferredInstallPrompt = event as BeforeInstallPromptEvent;
+    syncInstallUi();
+  });
+
+  window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    state.isInstalled = true;
+    state.isInstallDialogOpen = false;
+    syncInstallUi();
+  });
+
+  const standaloneMediaQuery = window.matchMedia('(display-mode: standalone)');
+  const handleStandaloneChange = () => {
+    state.isInstalled = isStandaloneApp();
+    if (state.isInstalled) {
+      state.isInstallDialogOpen = false;
+    }
+    syncInstallUi();
+  };
+
+  if (typeof standaloneMediaQuery.addEventListener === 'function') {
+    standaloneMediaQuery.addEventListener('change', handleStandaloneChange);
+  } else if (typeof standaloneMediaQuery.addListener === 'function') {
+    standaloneMediaQuery.addListener(handleStandaloneChange);
+  }
+
+  installEventsBound = true;
+}
+
 function getMainElements(): MainElements {
   return {
     languageSelect: document.querySelector<HTMLSelectElement>('#main-language-select')!,
+    installAppBtn: document.querySelector<HTMLButtonElement>('#install-app-btn')!,
+    installBanner: document.querySelector<HTMLDivElement>('#install-banner')!,
+    installBannerText: document.querySelector<HTMLSpanElement>('#install-banner-text')!,
+    installBannerActionBtn: document.querySelector<HTMLButtonElement>('#install-banner-action-btn')!,
+    installBannerCloseBtn: document.querySelector<HTMLButtonElement>('#install-banner-close-btn')!,
+    installDialog: document.querySelector<HTMLDialogElement>('#install-dialog')!,
     themeToggleBtn: document.querySelector<HTMLButtonElement>('#theme-toggle-btn')!,
     scanBtn: document.querySelector<HTMLButtonElement>('#scan-btn')!,
     scanLocalImageBtn: document.querySelector<HTMLButtonElement>('#scan-local-image-btn')!,
@@ -625,6 +820,7 @@ function getMainElements(): MainElements {
     scanStatusText: document.querySelector<HTMLSpanElement>('#scan-status-text')!,
     scanStatusCloseBtn: document.querySelector<HTMLButtonElement>('#scan-status-close-btn')!,
     scanResult: document.querySelector<HTMLDivElement>('#scan-result')!,
+    scanResultCloseBtn: document.querySelector<HTMLButtonElement>('#scan-result-close-btn')!,
     resultText: document.querySelector<HTMLDivElement>('#result-text')!,
     copyBtn: document.querySelector<HTMLButtonElement>('#copy-btn')!,
     openBtn: document.querySelector<HTMLButtonElement>('#open-btn')!,
@@ -650,6 +846,7 @@ function syncMainViewFromState() {
     return;
   }
 
+  syncInstallUi();
   mainElements.genInput.value = state.genInputText;
   updateGenerateButtonState();
   setScanButtonState(scanning);
@@ -701,6 +898,48 @@ async function bindMainViewEvents() {
 
   const elements = mainElements;
 
+  const openInstallFlow = async () => {
+    if (state.installMode === 'ios') {
+      state.isInstallDialogOpen = true;
+      if (!elements.installDialog.open) {
+        elements.installDialog.showModal();
+      }
+      return;
+    }
+
+    if (state.installMode !== 'native' || !deferredInstallPrompt) {
+      return;
+    }
+
+    const installPromptEvent = deferredInstallPrompt;
+    deferredInstallPrompt = null;
+
+    try {
+      await installPromptEvent.prompt();
+      await installPromptEvent.userChoice;
+    } finally {
+      syncInstallUi();
+    }
+  };
+
+  elements.installAppBtn.addEventListener('click', () => {
+    void openInstallFlow();
+  });
+
+  elements.installBannerActionBtn.addEventListener('click', () => {
+    void openInstallFlow();
+  });
+
+  elements.installBannerCloseBtn.addEventListener('click', async () => {
+    state.installHintDismissed = true;
+    await saveAppSettings({ installHintDismissed: true });
+    syncInstallUi();
+  });
+
+  elements.installDialog.addEventListener('close', () => {
+    state.isInstallDialogOpen = false;
+  });
+
   elements.themeToggleBtn.addEventListener('click', async () => {
     state.theme = state.theme === 'dracula' ? 'emerald' : 'dracula';
     await saveAppSettings({ theme: state.theme });
@@ -726,32 +965,48 @@ async function bindMainViewEvents() {
 
     clearScanResult();
     hideStatus();
+    const requestToken = ++scanRequestToken;
     elements.scannerContainer.classList.remove('hidden');
     watchScannerVideoReady();
     scanning = true;
     setScanButtonState(true);
 
-    await scanner.start(
-      (decodedText) => {
-        if (!mainElements) {
-          return;
-        }
+    try {
+      const scanner = await getScanner();
+      if (!mainElements || !scanning || requestToken !== scanRequestToken) {
+        return;
+      }
 
-        state.scanResultText = decodedText;
-        disposeVideoReadyWatcher?.();
-        disposeVideoReadyWatcher = null;
-        setScannerLoading(false);
-        resetScannerPreviewAspectRatio();
-        scanning = false;
-        setScanButtonState(false);
-        elements.scannerContainer.classList.add('hidden');
-        hideStatus();
-        showScanResult(decodedText);
-      },
-      handleScannerError,
-    );
+      await scanner.start(
+        (decodedText) => {
+          if (!mainElements) {
+            return;
+          }
 
-    await syncCameraPermissionHint();
+          state.scanResultText = decodedText;
+          disposeVideoReadyWatcher?.();
+          disposeVideoReadyWatcher = null;
+          setScannerLoading(false);
+          resetScannerPreviewAspectRatio();
+          scanning = false;
+          setScanButtonState(false);
+          elements.scannerContainer.classList.add('hidden');
+          hideStatus();
+          showScanResult(decodedText);
+        },
+        handleScannerError,
+      );
+
+      await syncCameraPermissionHint();
+    } catch (error) {
+      await stopScanner();
+      showStatus(
+        translate('cameraStartFailed', {
+          detail: error instanceof Error ? error.message : String(error),
+        }),
+        'error',
+      );
+    }
   });
 
   elements.scanLocalImageBtn.addEventListener('click', async () => {
@@ -826,6 +1081,10 @@ async function bindMainViewEvents() {
 
   elements.scanStatusCloseBtn.addEventListener('click', () => {
     hideStatus();
+  });
+
+  elements.scanResultCloseBtn.addEventListener('click', () => {
+    clearScanResult();
   });
 
   elements.openBtn.addEventListener('click', () => {
@@ -971,11 +1230,16 @@ function renderOnboardingView() {
 
 async function init() {
   bindGlobalListeners();
+  bindInstallEvents();
+  registerPwa();
 
   const settings = await getResolvedSettings();
   state.locale = settings.locale;
   state.theme = settings.theme;
   state.onboardingCompleted = settings.onboardingCompleted;
+  state.installHintDismissed = settings.installHintDismissed;
+  state.isInstalled = isStandaloneApp();
+  state.installMode = resolveInstallMode();
 
   if (state.onboardingCompleted) {
     await renderMainView();
