@@ -1,11 +1,11 @@
-import QRCode from 'qrcode';
+import QRCode from "qrcode";
 
 const QR_PREVIEW_WIDTH = 280;
 const QR_MARGIN = 2;
 const QR_MIN_MODULE_PIXEL_SIZE = 6;
 const QR_MAX_EXPORT_WIDTH = 1400;
-const QR_CAPACITY_FIRST_PASS_LEVEL = 'M';
-const QR_CAPACITY_FALLBACK_LEVEL = 'L';
+const QR_CAPACITY_FIRST_PASS_LEVEL = "M";
+const QR_CAPACITY_FALLBACK_LEVEL = "L";
 
 type AdaptiveErrorCorrectionLevel =
   | typeof QR_CAPACITY_FIRST_PASS_LEVEL
@@ -20,13 +20,13 @@ export interface QRCodeGenerationResult {
 
 export class QRCodeGenerationError extends Error {
   constructor(
-    readonly code: 'data-too-large',
+    readonly code: "data-too-large",
     options?: { cause?: unknown },
   ) {
     super(code);
-    this.name = 'QRCodeGenerationError';
+    this.name = "QRCodeGenerationError";
 
-    if (options && 'cause' in options) {
+    if (options && "cause" in options) {
       this.cause = options.cause;
     }
   }
@@ -66,8 +66,8 @@ export async function generateQRCode(
         margin: QR_MARGIN,
         errorCorrectionLevel,
         color: {
-          dark: '#000000',
-          light: '#ffffff',
+          dark: "#000000",
+          light: "#ffffff",
         },
       });
 
@@ -87,7 +87,7 @@ export async function generateQRCode(
     }
   }
 
-  throw new QRCodeGenerationError('data-too-large', {
+  throw new QRCodeGenerationError("data-too-large", {
     cause: lastDataTooLargeError ?? undefined,
   });
 }

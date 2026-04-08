@@ -1,8 +1,8 @@
 export type QRScannerError =
-  | { code: 'permission-denied' }
-  | { code: 'camera-start-failed'; detail: string };
+  | { code: "permission-denied" }
+  | { code: "camera-start-failed"; detail: string };
 
-type ZxingQrDecoderModule = typeof import('@/components/scanner-zxing');
+type ZxingQrDecoderModule = typeof import("@/components/scanner-zxing");
 
 interface ScanRegion {
   x: number;
@@ -35,7 +35,7 @@ const MAX_UPSCALE_FACTOR = 2.5;
 let zxingQrDecoderModulePromise: Promise<ZxingQrDecoderModule> | null = null;
 
 function loadZxingQrDecoderModule() {
-  zxingQrDecoderModulePromise ??= import('@/components/scanner-zxing');
+  zxingQrDecoderModulePromise ??= import("@/components/scanner-zxing");
   return zxingQrDecoderModulePromise;
 }
 
@@ -61,12 +61,12 @@ export class QRScanner {
   async checkCameraPermission(): Promise<PermissionState> {
     try {
       const result = await navigator.permissions.query({
-        name: 'camera' as PermissionName,
+        name: "camera" as PermissionName,
       });
       return result.state;
     } catch {
       // Firefox doesn't support querying camera permission
-      return 'prompt';
+      return "prompt";
     }
   }
 
@@ -76,8 +76,8 @@ export class QRScanner {
   ): Promise<void> {
     const permState = await this.checkCameraPermission();
 
-    if (permState === 'denied') {
-      onError({ code: 'permission-denied' });
+    if (permState === "denied") {
+      onError({ code: "permission-denied" });
       return;
     }
 
@@ -108,7 +108,7 @@ export class QRScanner {
     } catch (err) {
       await this.stop();
       onError({
-        code: 'camera-start-failed',
+        code: "camera-start-failed",
         detail: err instanceof Error ? err.message : String(err),
       });
     }
@@ -141,12 +141,12 @@ export class QRScanner {
 
     const host = document.getElementById(this.elementId);
     if (host) {
-      host.innerHTML = '';
+      host.innerHTML = "";
     }
   }
 
   async scanImageBlob(blob: Blob): Promise<string | null> {
-    if (typeof createImageBitmap === 'function') {
+    if (typeof createImageBitmap === "function") {
       const bitmap = await createImageBitmap(blob);
 
       try {
@@ -161,7 +161,7 @@ export class QRScanner {
   }
 
   private createBarcodeDetector(): BarcodeDetectorLike | null {
-    if (!('BarcodeDetector' in globalThis)) {
+    if (!("BarcodeDetector" in globalThis)) {
       return null;
     }
 
@@ -176,7 +176,7 @@ export class QRScanner {
         return null;
       }
 
-      return new NativeBarcodeDetector({ formats: ['qr_code'] });
+      return new NativeBarcodeDetector({ formats: ["qr_code"] });
     } catch {
       return null;
     }
@@ -185,7 +185,7 @@ export class QRScanner {
   private async getPreferredCameraId(): Promise<string | null> {
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
-      const cameras = devices.filter((device) => device.kind === 'videoinput');
+      const cameras = devices.filter((device) => device.kind === "videoinput");
 
       if (cameras.length === 0) {
         return null;
@@ -227,9 +227,7 @@ export class QRScanner {
 
   private createVideoConstraints(cameraId: string | null): MediaTrackConstraints {
     return {
-      ...(cameraId
-        ? { deviceId: { exact: cameraId } }
-        : { facingMode: 'environment' as const }),
+      ...(cameraId ? { deviceId: { exact: cameraId } } : { facingMode: "environment" as const }),
       width: { ideal: 1920 },
       height: { ideal: 1080 },
       frameRate: { ideal: 30, max: 30 },
@@ -242,9 +240,9 @@ export class QRScanner {
       throw new Error(`Scanner host #${this.elementId} not found.`);
     }
 
-    host.innerHTML = '';
+    host.innerHTML = "";
 
-    const video = document.createElement('video');
+    const video = document.createElement("video");
     video.autoplay = true;
     video.muted = true;
     video.playsInline = true;
@@ -269,9 +267,9 @@ export class QRScanner {
           window.clearTimeout(timeoutId);
         }
 
-        video.removeEventListener('loadeddata', handleReady);
-        video.removeEventListener('canplay', handleReady);
-        video.removeEventListener('playing', handleReady);
+        video.removeEventListener("loadeddata", handleReady);
+        video.removeEventListener("canplay", handleReady);
+        video.removeEventListener("playing", handleReady);
       };
 
       const finish = (callback: () => void) => {
@@ -289,12 +287,12 @@ export class QRScanner {
       };
 
       timeoutId = window.setTimeout(() => {
-        finish(() => reject(new Error('Timed out while waiting for the camera preview.')));
+        finish(() => reject(new Error("Timed out while waiting for the camera preview.")));
       }, 10000);
 
-      video.addEventListener('loadeddata', handleReady, { once: true });
-      video.addEventListener('canplay', handleReady, { once: true });
-      video.addEventListener('playing', handleReady, { once: true });
+      video.addEventListener("loadeddata", handleReady, { once: true });
+      video.addEventListener("canplay", handleReady, { once: true });
+      video.addEventListener("playing", handleReady, { once: true });
       void video.play().catch(() => {});
     });
 
@@ -310,7 +308,7 @@ export class QRScanner {
     const settings = track.getSettings();
     const constraints: AdvancedTrackConstraints = {};
     const capabilities =
-      typeof track.getCapabilities === 'function'
+      typeof track.getCapabilities === "function"
         ? (track.getCapabilities() as ExtendedMediaTrackCapabilities)
         : null;
 
@@ -321,14 +319,14 @@ export class QRScanner {
     }
 
     const advanced: Array<Record<string, unknown>> = [];
-    if (capabilities?.focusMode?.includes('continuous')) {
-      advanced.push({ focusMode: 'continuous' });
-    } else if (capabilities?.focusMode?.includes('single-shot')) {
-      advanced.push({ focusMode: 'single-shot' });
+    if (capabilities?.focusMode?.includes("continuous")) {
+      advanced.push({ focusMode: "continuous" });
+    } else if (capabilities?.focusMode?.includes("single-shot")) {
+      advanced.push({ focusMode: "single-shot" });
     }
 
-    if (capabilities?.exposureMode?.includes('continuous')) {
-      advanced.push({ exposureMode: 'continuous' });
+    if (capabilities?.exposureMode?.includes("continuous")) {
+      advanced.push({ exposureMode: "continuous" });
     }
 
     if (advanced.length > 0) {
@@ -441,9 +439,7 @@ export class QRScanner {
     return null;
   }
 
-  private async tryDecodeWithBarcodeDetector(
-    source: CanvasImageSource,
-  ): Promise<string | null> {
+  private async tryDecodeWithBarcodeDetector(source: CanvasImageSource): Promise<string | null> {
     if (!this.barcodeDetector) {
       return null;
     }
@@ -481,11 +477,7 @@ export class QRScanner {
     return this.deduplicateRegions(regions);
   }
 
-  private createCenteredRegion(
-    frameWidth: number,
-    frameHeight: number,
-    scale: number,
-  ): ScanRegion {
+  private createCenteredRegion(frameWidth: number, frameHeight: number, scale: number): ScanRegion {
     const width = Math.max(1, Math.floor(frameWidth * scale));
     const height = Math.max(1, Math.floor(frameHeight * scale));
 
@@ -533,7 +525,7 @@ export class QRScanner {
     const context = this.scanContext;
 
     if (!context) {
-      throw new Error('Failed to initialize the scan canvas context.');
+      throw new Error("Failed to initialize the scan canvas context.");
     }
 
     const maxRegionSide = Math.max(region.width, region.height);
@@ -580,7 +572,7 @@ export class QRScanner {
 
       image.onerror = () => {
         cleanup();
-        reject(new Error('Failed to load the selected image.'));
+        reject(new Error("Failed to load the selected image."));
       };
 
       image.src = imageUrl;
@@ -589,15 +581,15 @@ export class QRScanner {
 
   private ensureScanCanvas(frameWidth: number, frameHeight: number): HTMLCanvasElement {
     if (!this.scanCanvas) {
-      this.scanCanvas = document.createElement('canvas');
+      this.scanCanvas = document.createElement("canvas");
       this.scanCanvas.width = frameWidth;
       this.scanCanvas.height = frameHeight;
-      this.scanContext = this.scanCanvas.getContext('2d', {
+      this.scanContext = this.scanCanvas.getContext("2d", {
         willReadFrequently: true,
       });
 
       if (!this.scanContext) {
-        throw new Error('Failed to create a 2D scan context.');
+        throw new Error("Failed to create a 2D scan context.");
       }
 
       this.scanContext.imageSmoothingEnabled = false;

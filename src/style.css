@@ -1,7 +1,9 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 
 @plugin "daisyui" {
-  themes: emerald --default, dracula;
+  themes:
+    emerald --default,
+    dracula;
 }
 
 :root {
@@ -21,7 +23,7 @@ body {
   box-sizing: border-box;
 }
 
-html[data-theme='dracula'] {
+html[data-theme="dracula"] {
   --page-background:
     radial-gradient(circle at top, rgb(189 147 249 / 0.16), transparent 42%),
     linear-gradient(180deg, rgb(40 42 54), rgb(28 29 38));
@@ -40,7 +42,7 @@ body {
   margin: 0 auto;
 }
 
-.tabs input[type='radio']:checked + .tab-content {
+.tabs input[type="radio"]:checked + .tab-content {
   display: flex;
   flex-direction: column;
   gap: 1rem;

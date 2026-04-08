@@ -1,5 +1,5 @@
-export type SupportedLocale = 'zh-CN' | 'en';
-export type SupportedTheme = 'emerald' | 'dracula';
+export type SupportedLocale = "zh-CN" | "en";
+export type SupportedTheme = "emerald" | "dracula";
 
 export interface AppSettings {
   locale: SupportedLocale;
@@ -8,8 +8,8 @@ export interface AppSettings {
   installHintDismissed: boolean;
 }
 
-const APP_SETTINGS_KEY = 'app-settings';
-const LEGACY_SETTINGS_KEY = 'extension-settings';
+const APP_SETTINGS_KEY = "app-settings";
+const LEGACY_SETTINGS_KEY = "extension-settings";
 
 function parseStoredSettings(raw: string | null): Partial<AppSettings> {
   if (!raw) {
@@ -18,7 +18,7 @@ function parseStoredSettings(raw: string | null): Partial<AppSettings> {
 
   try {
     const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? (parsed as Partial<AppSettings>) : {};
+    return parsed && typeof parsed === "object" ? (parsed as Partial<AppSettings>) : {};
   } catch {
     return {};
   }
@@ -43,11 +43,11 @@ function writeStoredSettings(settings: AppSettings) {
 }
 
 function isSupportedLocale(value: unknown): value is SupportedLocale {
-  return value === 'zh-CN' || value === 'en';
+  return value === "zh-CN" || value === "en";
 }
 
 function isSupportedTheme(value: unknown): value is SupportedTheme {
-  return value === 'emerald' || value === 'dracula';
+  return value === "emerald" || value === "dracula";
 }
 
 export function normalizeLocale(value: unknown): SupportedLocale {
@@ -59,7 +59,7 @@ export function normalizeLocale(value: unknown): SupportedLocale {
 }
 
 export function getInitialLocale(): SupportedLocale {
-  return navigator.language.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en';
+  return navigator.language.toLowerCase().startsWith("zh") ? "zh-CN" : "en";
 }
 
 export async function getAppSettings(): Promise<Partial<AppSettings>> {
@@ -69,11 +69,9 @@ export async function getAppSettings(): Promise<Partial<AppSettings>> {
     locale: isSupportedLocale(settings.locale) ? settings.locale : undefined,
     theme: isSupportedTheme(settings.theme) ? settings.theme : undefined,
     onboardingCompleted:
-      typeof settings.onboardingCompleted === 'boolean'
-        ? settings.onboardingCompleted
-        : undefined,
+      typeof settings.onboardingCompleted === "boolean" ? settings.onboardingCompleted : undefined,
     installHintDismissed:
-      typeof settings.installHintDismissed === 'boolean'
+      typeof settings.installHintDismissed === "boolean"
         ? settings.installHintDismissed
         : undefined,
   };
@@ -84,25 +82,23 @@ export async function getResolvedSettings(): Promise<AppSettings> {
 
   return {
     locale: stored.locale ?? getInitialLocale(),
-    theme: stored.theme ?? 'emerald',
+    theme: stored.theme ?? "emerald",
     onboardingCompleted: stored.onboardingCompleted ?? false,
     installHintDismissed: stored.installHintDismissed ?? false,
   };
 }
 
-export async function saveAppSettings(
-  partial: Partial<AppSettings>,
-): Promise<AppSettings> {
+export async function saveAppSettings(partial: Partial<AppSettings>): Promise<AppSettings> {
   const current = await getResolvedSettings();
   const next: AppSettings = {
     locale: isSupportedLocale(partial.locale) ? partial.locale : current.locale,
     theme: isSupportedTheme(partial.theme) ? partial.theme : current.theme,
     onboardingCompleted:
-      typeof partial.onboardingCompleted === 'boolean'
+      typeof partial.onboardingCompleted === "boolean"
         ? partial.onboardingCompleted
         : current.onboardingCompleted,
     installHintDismissed:
-      typeof partial.installHintDismissed === 'boolean'
+      typeof partial.installHintDismissed === "boolean"
         ? partial.installHintDismissed
         : current.installHintDismissed,
   };
