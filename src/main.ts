@@ -68,6 +68,7 @@ interface MainElements {
   scanImageInput: HTMLInputElement;
   scannerContainer: HTMLDivElement;
   scannerPreview: HTMLDivElement;
+  scannerFullscreenBtn: HTMLButtonElement;
   scannerLoading: HTMLDivElement;
   qrReader: HTMLDivElement;
   scanStatus: HTMLDivElement;
@@ -387,6 +388,59 @@ async function toggleQrFullscreen() {
   }
 }
 
+function isScannerPreviewFullscreen() {
+  return !!mainElements && document.fullscreenElement === mainElements.scannerPreview;
+}
+
+function syncScannerFullscreenButton() {
+  if (!mainElements) {
+    return;
+  }
+
+  const isFullscreen = isScannerPreviewFullscreen();
+  const label = translate(isFullscreen ? "exitFullscreen" : "enterFullscreen");
+  mainElements.scannerFullscreenBtn.setAttribute("aria-label", label);
+  mainElements.scannerFullscreenBtn.setAttribute("title", label);
+  mainElements.scannerFullscreenBtn.classList.toggle("btn-active", isFullscreen);
+}
+
+async function exitScannerFullscreenIfActive() {
+  if (!isScannerPreviewFullscreen()) {
+    return;
+  }
+
+  try {
+    await document.exitFullscreen();
+  } catch {
+    // Best effort when leaving scanner mode; browsers may reject during teardown.
+  } finally {
+    syncScannerFullscreenButton();
+  }
+}
+
+async function toggleScannerFullscreen() {
+  if (!mainElements) {
+    return;
+  }
+
+  try {
+    if (isScannerPreviewFullscreen()) {
+      await document.exitFullscreen();
+    } else if (typeof mainElements.scannerPreview.requestFullscreen === "function") {
+      await mainElements.scannerPreview.requestFullscreen();
+    } else {
+      throw new Error(translate("fullscreenFailed"));
+    }
+  } catch (error) {
+    showStatus(
+      error instanceof Error && error.message ? error.message : translate("fullscreenFailed"),
+      "error",
+    );
+  } finally {
+    syncScannerFullscreenButton();
+  }
+}
+
 function clearGeneratedCode() {
   if (!mainElements) {
     state.generatedText = null;
@@ -632,6 +686,7 @@ async function stopScanner() {
   disposeVideoReadyWatcher = null;
   setScannerLoading(false);
   resetScannerPreviewAspectRatio();
+  await exitScannerFullscreenIfActive();
 
   if (scanning && scannerInstance) {
     await scannerInstance.stop();
@@ -822,6 +877,7 @@ function getMainElements(): MainElements {
     scanImageInput: document.querySelector<HTMLInputElement>("#scan-image-input")!,
     scannerContainer: document.querySelector<HTMLDivElement>("#scanner-container")!,
     scannerPreview: document.querySelector<HTMLDivElement>("#scanner-preview")!,
+    scannerFullscreenBtn: document.querySelector<HTMLButtonElement>("#scanner-fullscreen-btn")!,
     scannerLoading: document.querySelector<HTMLDivElement>("#scanner-loading")!,
     qrReader: document.querySelector<HTMLDivElement>("#qr-reader")!,
     scanStatus: document.querySelector<HTMLDivElement>("#scan-status")!,
@@ -859,6 +915,7 @@ function syncMainViewFromState() {
   updateGenerateButtonState();
   setScanButtonState(scanning);
   syncQrFullscreenButton();
+  syncScannerFullscreenButton();
 
   if (state.scanResultText) {
     showScanResult(state.scanResultText);
@@ -894,6 +951,7 @@ function bindGlobalListeners() {
 
   document.addEventListener("fullscreenchange", () => {
     syncQrFullscreenButton();
+    syncScannerFullscreenButton();
   });
 
   globalListenersBound = true;
@@ -997,6 +1055,7 @@ async function bindMainViewEvents() {
         resetScannerPreviewAspectRatio();
         scanning = false;
         setScanButtonState(false);
+        void exitScannerFullscreenIfActive();
         elements.scannerContainer.classList.add("hidden");
         hideStatus();
         showScanResult(decodedText);
@@ -1136,6 +1195,9 @@ async function bindMainViewEvents() {
   elements.qrCanvas.addEventListener("contextmenu", openQrContextMenu);
   elements.qrFullscreenBtn.addEventListener("click", async () => {
     await toggleQrFullscreen();
+  });
+  elements.scannerFullscreenBtn.addEventListener("click", async () => {
+    await toggleScannerFullscreen();
   });
   elements.qrDialog.addEventListener("close", () => {
     closeQrContextMenu();

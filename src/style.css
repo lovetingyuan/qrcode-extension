@@ -48,6 +48,39 @@ body {
   gap: 1rem;
 }
 
+#gen-input {
+  border: 2px solid transparent;
+  background-image:
+    linear-gradient(var(--color-base-100), var(--color-base-100)),
+    linear-gradient(
+      120deg,
+      oklch(70% 0.18 25),
+      oklch(78% 0.18 85),
+      oklch(76% 0.18 155),
+      oklch(72% 0.2 235),
+      oklch(72% 0.18 305),
+      oklch(70% 0.18 25)
+    );
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  background-size:
+    auto,
+    240% 240%;
+  background-position:
+    center,
+    0% 50%;
+  transition:
+    background-position 180ms ease,
+    box-shadow 180ms ease;
+}
+
+#gen-input:focus {
+  background-position:
+    center,
+    100% 50%;
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-primary) 18%, transparent);
+}
+
 #qr-canvas-stage {
   width: 100%;
   display: inline-flex;
@@ -116,6 +149,17 @@ body {
   max-width: 100%;
   max-height: var(--scanner-max-height);
   aspect-ratio: var(--scanner-aspect-ratio);
+}
+
+#scanner-preview:fullscreen {
+  width: 100vw;
+  max-width: 100vw;
+  height: 100vh;
+  max-height: 100vh;
+  aspect-ratio: auto;
+  border-radius: 0;
+  border: 0;
+  background: rgb(5 23 17);
 }
 
 #qr-reader {

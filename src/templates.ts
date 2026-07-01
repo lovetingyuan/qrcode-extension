@@ -175,7 +175,7 @@ export function renderMainTemplate(
             <div class="relative">
               <textarea
                 id="gen-input"
-                class="textarea textarea-bordered w-full bg-base-100 px-4 pt-3 pr-11 pb-8 shadow-sm focus:border-primary focus:outline-none"
+                class="textarea textarea-bordered w-full bg-base-100 px-4 pt-3 pr-11 pb-8 shadow-sm focus:outline-none"
                 placeholder="${t(locale, "generatePlaceholder")}"
                 rows="6"
               ></textarea>
@@ -274,6 +274,17 @@ export function renderMainTemplate(
                 id="scanner-preview"
                 class="relative overflow-hidden border-y border-emerald-700/30 bg-[linear-gradient(180deg,_rgb(8_31_25_/_0.98),_rgb(5_23_17_/_0.96))]"
               >
+                <button
+                  id="scanner-fullscreen-btn"
+                  type="button"
+                  class="btn btn-circle btn-ghost btn-sm absolute top-3 right-3 z-20 text-emerald-50 hover:bg-emerald-50/10"
+                  aria-label="${t(locale, "enterFullscreen")}"
+                  title="${t(locale, "enterFullscreen")}"
+                >
+                  <svg viewBox="0 0 24 24" class="h-4 w-4 fill-current" aria-hidden="true">
+                    <path d="M4.75 9A.75.75 0 0 1 4 8.25v-3.5C4 4.34 4.34 4 4.75 4h3.5a.75.75 0 0 1 0 1.5H5.5v2.75A.75.75 0 0 1 4.75 9Zm14.5 0a.75.75 0 0 1-.75-.75V5.5h-2.75a.75.75 0 0 1 0-1.5h3.5c.41 0 .75.34.75.75v3.5a.75.75 0 0 1-.75.75Zm-11 11h-3.5A.75.75 0 0 1 4 19.25v-3.5a.75.75 0 0 1 1.5 0v2.75h2.75a.75.75 0 0 1 0 1.5Zm11.75-.75a.75.75 0 0 1-.75.75h-3.5a.75.75 0 0 1 0-1.5h2.75v-2.75a.75.75 0 0 1 1.5 0v3.5Z" />
+                  </svg>
+                </button>
                 <div
                   id="scanner-loading"
                   class="hidden absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-[linear-gradient(180deg,_rgb(5_23_17_/_0.82),_rgb(5_23_17_/_0.62))] text-emerald-50 backdrop-blur-[4px]"
