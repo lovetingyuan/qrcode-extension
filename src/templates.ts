@@ -175,21 +175,34 @@ export function renderMainTemplate(
             <div class="relative">
               <textarea
                 id="gen-input"
-                class="textarea textarea-bordered w-full bg-base-100 px-4 pt-3 pr-11 pb-8 shadow-sm focus:outline-none"
+                class="textarea textarea-bordered w-full bg-base-100 px-4 pt-3 pr-20 pb-8 shadow-sm focus:outline-none"
                 placeholder="${t(locale, "generatePlaceholder")}"
                 rows="6"
               ></textarea>
-              <button
-                id="gen-clear-btn"
-                type="button"
-                class="btn btn-ghost btn-xs absolute right-2.5 bottom-2.5 hidden h-7 min-h-7 w-7 min-w-7 rounded-full border border-base-300 bg-base-100 p-0 text-base-content transition-colors hover:bg-base-200"
-                aria-label="${t(locale, "clearGenerateInput")}"
-                title="${t(locale, "clearGenerateInput")}"
-              >
-                <svg viewBox="0 0 20 20" class="h-3.5 w-3.5 fill-current" aria-hidden="true">
-                  <path d="M5.22 5.22a.75.75 0 0 1 1.06 0L10 8.94l3.72-3.72a.75.75 0 1 1 1.06 1.06L11.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06L10 11.06l-3.72 3.72a.75.75 0 1 1-1.06-1.06L8.94 10 5.22 6.28a.75.75 0 0 1 0-1.06Z" />
-                </svg>
-              </button>
+              <div class="absolute right-2.5 bottom-2.5 flex items-center gap-1">
+                <button
+                  id="gen-paste-btn"
+                  type="button"
+                  class="btn btn-ghost btn-xs h-7 min-h-7 w-7 min-w-7 rounded-full border border-base-300 bg-base-100 p-0 text-base-content transition-colors hover:bg-base-200"
+                  aria-label="${t(locale, "pasteGenerateInput")}"
+                  title="${t(locale, "pasteGenerateInput")}"
+                >
+                  <svg viewBox="0 0 20 20" class="h-3.5 w-3.5 fill-current" aria-hidden="true">
+                    <path d="M6.75 3.25A1.75 1.75 0 0 1 8.5 1.5h3A1.75 1.75 0 0 1 13.25 3v.25h1A2.75 2.75 0 0 1 17 6v9.25A2.75 2.75 0 0 1 14.25 18h-8.5A2.75 2.75 0 0 1 3 15.25V6a2.75 2.75 0 0 1 2.75-2.75h1Zm1.5 0v.25h3.5V3a.25.25 0 0 0-.25-.25h-3a.25.25 0 0 0-.25.25ZM5.75 4.75A1.25 1.25 0 0 0 4.5 6v9.25c0 .69.56 1.25 1.25 1.25h8.5c.69 0 1.25-.56 1.25-1.25V6c0-.69-.56-1.25-1.25-1.25h-1v.25A1.75 1.75 0 0 1 11.5 6.75h-3A1.75 1.75 0 0 1 6.75 5v-.25h-1ZM8.5 4.75a.25.25 0 0 0-.25.25v.25c0 .14.11.25.25.25h3c.14 0 .25-.11.25-.25V5a.25.25 0 0 0-.25-.25h-3Z" />
+                  </svg>
+                </button>
+                <button
+                  id="gen-clear-btn"
+                  type="button"
+                  class="btn btn-ghost btn-xs hidden h-7 min-h-7 w-7 min-w-7 rounded-full border border-base-300 bg-base-100 p-0 text-base-content transition-colors hover:bg-base-200"
+                  aria-label="${t(locale, "clearGenerateInput")}"
+                  title="${t(locale, "clearGenerateInput")}"
+                >
+                  <svg viewBox="0 0 20 20" class="h-3.5 w-3.5 fill-current" aria-hidden="true">
+                    <path d="M5.22 5.22a.75.75 0 0 1 1.06 0L10 8.94l3.72-3.72a.75.75 0 1 1 1.06 1.06L11.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06L10 11.06l-3.72 3.72a.75.75 0 1 1-1.06-1.06L8.94 10 5.22 6.28a.75.75 0 0 1 0-1.06Z" />
+                  </svg>
+                </button>
+              </div>
             </div>
             <div class="grid gap-2">
               <button id="gen-btn" class="btn btn-primary w-full" disabled>${t(locale, "generateButton")}</button>

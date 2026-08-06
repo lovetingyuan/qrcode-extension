@@ -80,6 +80,7 @@ interface MainElements {
   copyBtn: HTMLButtonElement;
   openBtn: HTMLButtonElement;
   genInput: HTMLTextAreaElement;
+  genPasteBtn: HTMLButtonElement;
   genClearBtn: HTMLButtonElement;
   genBtn: HTMLButtonElement;
   genStatus: HTMLDivElement;
@@ -889,6 +890,7 @@ function getMainElements(): MainElements {
     copyBtn: document.querySelector<HTMLButtonElement>("#copy-btn")!,
     openBtn: document.querySelector<HTMLButtonElement>("#open-btn")!,
     genInput: document.querySelector<HTMLTextAreaElement>("#gen-input")!,
+    genPasteBtn: document.querySelector<HTMLButtonElement>("#gen-paste-btn")!,
     genClearBtn: document.querySelector<HTMLButtonElement>("#gen-clear-btn")!,
     genBtn: document.querySelector<HTMLButtonElement>("#gen-btn")!,
     genStatus: document.querySelector<HTMLDivElement>("#gen-status")!,
@@ -1164,6 +1166,30 @@ async function bindMainViewEvents() {
       hideGenerateStatus();
     }
     updateGenerateButtonState();
+  });
+
+  elements.genPasteBtn.addEventListener("click", async () => {
+    if (!navigator.clipboard?.readText) {
+      showGenerateStatus(translate("pasteGenerateUnsupported"));
+      return;
+    }
+
+    try {
+      const clipboardText = await navigator.clipboard.readText();
+
+      if (!clipboardText) {
+        showGenerateStatus(translate("pasteGenerateEmpty"));
+        return;
+      }
+
+      elements.genInput.value = clipboardText;
+      elements.genInput.dispatchEvent(new Event("input", { bubbles: true }));
+      hideGenerateStatus();
+      elements.genInput.focus();
+    } catch (error) {
+      showGenerateStatus(translate("pasteGenerateFailed"));
+      console.error("Text clipboard read failed:", error);
+    }
   });
 
   elements.genClearBtn.addEventListener("click", () => {
